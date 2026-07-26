@@ -272,10 +272,8 @@ lopas-protocol-foundry/
 │
 ├─ receipts/
 ├─ tests/
-└─ docs/
-   ├─ architecture.md
-   ├─ safety-model.md
-   └─ poc-lifecycle.md
+└─ docs/# planned; not yet added
+
 ```
 
 ### Directory status
