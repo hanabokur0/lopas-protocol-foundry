@@ -22,4 +22,5 @@ packages = [
   "src.proxy",
   "src.protocol",
   "src.simulation",
+  "src.selection",
 ]
