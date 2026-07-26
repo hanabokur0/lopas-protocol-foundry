@@ -1,0 +1,43 @@
+schema_version: 0.1.0
+id: obs-idea-002
+observed_at: '2026-07-26T05:10:00Z'
+captured_at: '2026-07-26T05:11:00Z'
+source:
+  type: manual
+  source_id: example-note-002
+  uri: null
+  visibility: internal
+  author_ref: null
+  content_hash: null
+  usage_note: Synthetic example.
+task:
+  type: customer_support
+  context: missing attachment handling
+  description: Detect incomplete support requests before drafting a reply.
+observation:
+  type: workaround
+  summary: An operator checks for missing attachments before preparing a customer response.
+  raw_excerpt: null
+  language: en
+evidence:
+  density: medium
+  directness: direct
+  references:
+  - source_id: example-note-002
+    span: operator-note-1
+    note: Synthetic operational note.
+    uri: null
+signals:
+  repeated: true
+  interrupted: false
+  avoided: false
+  contradiction_detected: false
+  urgency: low
+  novelty_hint: A pre-draft validation gate may prevent avoidable reply loops.
+exclusions: []
+provenance:
+  ingestion_method: generated_test_fixture
+  recorded_by: example-generator
+  adapter_name: null
+  adapter_version: null
+  recorded_at: '2026-07-26T05:11:00Z'
