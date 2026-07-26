@@ -1,0 +1,81 @@
+schema_version: 0.1.0
+id: proxy-idea-002-llm
+created_at: '2026-07-26T10:00:00Z'
+observation_refs:
+- obs-idea-002
+task:
+  type: customer_support
+  context: missing attachment handling
+  description: Detect incomplete support requests before drafting a reply.
+actors:
+- role: support operator
+  impact: operator
+  note: null
+- role: customer
+  impact: affected_party
+  note: null
+friction:
+- type: request_completeness
+  summary: Required information may be missing before reply preparation.
+  severity: medium
+  evidence_refs:
+  - example-note-002
+- type: avoidable_reply_loop
+  summary: An incomplete request may create repeated clarification exchanges.
+  severity: medium
+  evidence_refs:
+  - example-note-002
+proposed_effects:
+- type: reply_loop_reduction
+  direction: positive
+  summary: A pre-draft completeness check may reduce avoidable clarification exchanges.
+  measurable: true
+- type: response_consistency_improvement
+  direction: positive
+  summary: A shared completeness check could make reply preparation more consistent.
+  measurable: null
+classification:
+  domain: service_operations
+  subdomain: customer_support
+  tags:
+  - customer-support
+  - request-completeness
+  - reply-preparation
+  - validation-gate
+  cluster_id: task:customer_support
+assessment:
+  evidence_density: medium
+  external_impact: medium
+  reversibility: high
+  generalizability: medium
+  novelty: medium
+  interpretation_required: true
+  creative_ownership_signal: false
+  confidence: 0.76
+constraints:
+- type: organizational
+  summary: The source material is internal and may not be reusable publicly.
+  hard: false
+- type: policy
+  summary: 'Source usage note: Synthetic example.'
+  hard: null
+risk_hints:
+- type: external_impact
+  summary: A derived protocol could affect a customer outside the operator's private workspace.
+  severity: medium
+  silent_failure_possible: true
+- type: incomplete_observability
+  summary: The observation does not establish whether every required request element can be detected reliably.
+  severity: medium
+  silent_failure_possible: true
+interpretation_notes:
+- The Proxy is an LLM interpretation of the supplied Observation, not a source fact or authorization.
+- The proposed reduction in clarification exchanges has not been measured.
+provenance:
+  generator: llm
+  generated_from:
+  - obs-idea-002
+  model: example-model
+  prompt_version: proxy-generation-0.1.0
+  rule_version: null
+  generated_at: '2026-07-26T10:00:00Z'
