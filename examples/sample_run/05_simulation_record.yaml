@@ -1,0 +1,57 @@
+schema_version: 0.1.0
+id: simrcpt-customer-support-stale-context-001
+run_id: run-customer-support-001
+protocol_candidate_ref: protocol-customer-support-llm-001
+scenario:
+  id: scenario-customer-support-llm-001-stale-context-gap
+  type: synthetic
+  summary: The supplied customer and policy context is stale even though all declared candidate conditions
+    appear usable.
+  adversarial: true
+  variables:
+    request_status: open
+    support_request_readable: true
+    authorized_reviewer_available: true
+    required_information_missing: false
+    support_policy_conflict: false
+    external_send_requested: false
+    human_review_approved: true
+    human_review_rejected: false
+    source_authority_withdrawn: false
+    source_context_stale: true
+    missing_required_input: null
+    requested_action: null
+    forced_failure_code: null
+    force_factual_error: false
+  source_refs:
+  - obs-idea-002
+simulator:
+  type: deterministic
+  name: lopas-protocol-foundry-simulator
+  version: deterministic-simulator-0.1.0
+  model: null
+  prompt_version: null
+started_at: '2026-07-26T12:59:59Z'
+ended_at: '2026-07-26T13:00:00Z'
+outcome:
+  task_completed: true
+  factual_error: false
+  policy_violation: false
+  escalation_required: false
+  escalation_detected: false
+  receipt_complete: true
+  output_summary: 'Route REVIEW. Task completed: true. No override matched; candidate default route used.'
+actual_route: REVIEW
+route_reason: No override matched; candidate default route used.
+trace:
+  decisions: []
+  unsupported_expressions: []
+  output_evidence_refs: []
+  evidence_refs:
+  - obs-idea-002
+failures: []
+provenance:
+  protocol_version: 0.1.0
+  scenario_generator_version: scenario-generation-0.1.0
+  environment_version: deterministic-simulator-0.1.0
+  recorded_at: '2026-07-26T13:00:00Z'
