@@ -1,0 +1,157 @@
+schema_version: 0.1.0
+id: protocol-customer-support-llm-001
+version: 0.1.0
+created_at: '2026-07-26T11:00:00Z'
+intent:
+  status: unconfirmed
+  requested_by: lopas-protocol-foundry
+  confirmation_refs: []
+  note: Generated as a candidate only. Simulation and explicit promotion are required before activation.
+task:
+  type: customer_support
+  context: missing attachment handling
+  description: Inspect a support request for completeness and prepare a human-reviewable clarification
+    or response draft.
+proxy_refs:
+- proxy-idea-002-llm
+trigger:
+  event: support_request_received
+  conditions:
+  - expression: request_status == 'open'
+    description: The support request is open.
+    on_unknown: HOLD
+inputs:
+  required:
+  - support_request
+  optional:
+  - attachment_metadata
+  - support_policy
+  - customer_history
+preconditions:
+- expression: support_request_readable == true
+  description: The support request can be read and parsed.
+  on_unknown: HOLD
+- expression: authorized_reviewer_available == true
+  description: An authorized reviewer is available for the generated draft.
+  on_unknown: HOLD
+steps:
+- id: step-check-request-completeness
+  action: assess_request_completeness
+  executor: rule
+  description: Check required request fields and declared attachment metadata.
+  input_refs:
+  - support_request
+  - attachment_metadata
+  output_refs:
+  - completeness_assessment
+  requires_human_confirmation: false
+  on_failure: HOLD
+- id: step-draft-support-response
+  action: generate_support_draft
+  executor: llm
+  description: Prepare a clarification request or grounded response draft from the available request information.
+  input_refs:
+  - support_request
+  - completeness_assessment
+  - support_policy
+  - customer_history
+  output_refs:
+  - draft_reply
+  requires_human_confirmation: false
+  on_failure: REVIEW
+- id: step-review-support-draft
+  action: request_human_review
+  executor: human
+  description: Review the completeness assessment and support draft before any external use.
+  input_refs:
+  - completeness_assessment
+  - draft_reply
+  output_refs:
+  - review_decision
+  requires_human_confirmation: true
+  on_failure: ABORT
+routing:
+  default: REVIEW
+  rules:
+  - when:
+      expression: required_information_missing == true
+      description: Required request information or a declared attachment is missing.
+      on_unknown: REVIEW
+    route: REVIEW
+    reason: A human reviewer must approve the clarification draft.
+  - when:
+      expression: support_policy_conflict == true
+      description: Applicable support instructions conflict.
+      on_unknown: ESCALATE
+    route: ESCALATE
+    reason: The candidate must not resolve policy conflicts silently.
+  - when:
+      expression: external_send_requested == true
+      description: The system is asked to send the draft externally.
+      on_unknown: DENY
+    route: DENY
+    reason: This unconfirmed candidate is draft-only and cannot send externally.
+stop_conditions:
+- expression: human_review_rejected == true
+  description: The reviewer rejected the generated support draft.
+  on_unknown: HOLD
+- expression: source_authority_withdrawn == true
+  description: Authority to use the supplied support context was withdrawn.
+  on_unknown: ESCALATE
+outputs:
+- name: completeness_assessment
+  type: structured_assessment
+  description: Available and missing request information.
+  sensitive: true
+- name: draft_reply
+  type: draft_message
+  description: A human-reviewable support response or clarification draft.
+  sensitive: true
+- name: review_decision
+  type: structured_decision
+  description: The human decision to accept, revise, or reject the draft.
+  sensitive: false
+failure_handling:
+  default_route: HOLD
+  retry_limit: 1
+  record_receipt: true
+  known_failures:
+  - code: UNREADABLE_REQUEST
+    description: The support request cannot be parsed reliably.
+    route: HOLD
+  - code: POLICY_CONFLICT
+    description: Applicable support instructions conflict.
+    route: ESCALATE
+  - code: REQUIRED_INFORMATION_UNKNOWN
+    description: Required request information cannot be established.
+    route: HOLD
+safety:
+  external_impact: medium
+  reversibility: high
+  authority_scope: draft
+  creative_ownership_signal: false
+  personal_data_possible: true
+  required_human_review: true
+  forbidden_actions:
+  - activate_without_promotion
+  - execute_when_required_input_is_unknown
+  - send_without_review
+  - invent_customer_information
+  - change_account_state
+  - promise_unapproved_compensation
+  - expose_confidential_source_content
+activation:
+  required_observations: 5
+  required_source_diversity: 3
+  required_simulations: 30
+  minimum_pass_rate: 0.9
+  human_confirmation: true
+provenance:
+  observation_refs:
+  - obs-idea-002
+  proxy_refs:
+  - proxy-idea-002-llm
+  generator: llm
+  model: example-model
+  prompt_version: protocol-generation-0.1.0
+  rule_version: null
