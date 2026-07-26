@@ -1,0 +1,469 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:lopas:protocol-foundry:simulation-receipt:0.1.0
+title: LoPAS Simulation Receipt
+description: >
+  A traceable record of one protocol candidate evaluated in one scenario.
+  Simulation receipts record outcomes and divergences; they do not prove
+  real-world effectiveness.
+type: object
+additionalProperties: false
+
+required:
+  - schema_version
+  - id
+  - run_id
+  - protocol_candidate_ref
+  - scenario
+  - simulator
+  - started_at
+  - ended_at
+  - outcome
+  - metrics
+  - routing
+  - divergences
+  - failures
+  - grader
+  - verdict
+  - provenance
+
+properties:
+  schema_version:
+    const: 0.1.0
+
+  id:
+    type: string
+    pattern: '^simrcpt-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  run_id:
+    type: string
+    pattern: '^run-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  protocol_candidate_ref:
+    type: string
+    pattern: '^protocol-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  scenario:
+    $ref: '#/$defs/scenario'
+
+  simulator:
+    $ref: '#/$defs/simulator'
+
+  started_at:
+    type: string
+    format: date-time
+
+  ended_at:
+    type: string
+    format: date-time
+
+  outcome:
+    $ref: '#/$defs/outcome'
+
+  metrics:
+    $ref: '#/$defs/metrics'
+
+  routing:
+    $ref: '#/$defs/routing'
+
+  divergences:
+    type: array
+    items:
+      $ref: '#/$defs/divergence'
+    default: []
+
+  failures:
+    type: array
+    items:
+      $ref: '#/$defs/failure'
+    default: []
+
+  grader:
+    $ref: '#/$defs/grader'
+
+  verdict:
+    $ref: '#/$defs/verdict'
+
+  provenance:
+    $ref: '#/$defs/provenance'
+
+$defs:
+  scenario:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - type
+      - summary
+      - adversarial
+      - variables
+    properties:
+      id:
+        type: string
+        pattern: '^scenario-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+      type:
+        type: string
+        enum:
+          - synthetic
+          - historical_replay
+          - shadow
+          - manual
+
+      summary:
+        type: string
+        minLength: 1
+
+      adversarial:
+        type: boolean
+
+      variables:
+        type: object
+        description: Scenario-specific values; keys must remain inspectable.
+        additionalProperties:
+          type:
+            - string
+            - number
+            - integer
+            - boolean
+            - "null"
+
+      source_refs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        default: []
+
+  simulator:
+    type: object
+    additionalProperties: false
+    required:
+      - type
+      - name
+      - version
+    properties:
+      type:
+        type: string
+        enum:
+          - deterministic
+          - llm
+          - multi_agent
+          - replay_engine
+          - hybrid
+
+      name:
+        type: string
+        minLength: 1
+
+      version:
+        type: string
+        minLength: 1
+
+      model:
+        type:
+          - string
+          - "null"
+        default: null
+
+      prompt_version:
+        type:
+          - string
+          - "null"
+        default: null
+
+  outcome:
+    type: object
+    additionalProperties: false
+    required:
+      - task_completed
+      - factual_error
+      - policy_violation
+      - escalation_required
+      - escalation_detected
+      - receipt_complete
+    properties:
+      task_completed:
+        type: boolean
+
+      factual_error:
+        type: boolean
+
+      policy_violation:
+        type: boolean
+
+      escalation_required:
+        type: boolean
+
+      escalation_detected:
+        type: boolean
+
+      receipt_complete:
+        type: boolean
+
+      output_summary:
+        type:
+          - string
+          - "null"
+        default: null
+
+  metrics:
+    type: object
+    additionalProperties: false
+    required:
+      - completion
+      - safety
+      - explainability
+      - human_work_reduction
+      - novelty
+      - confidence
+    properties:
+      completion:
+        $ref: '#/$defs/unit_score'
+
+      safety:
+        $ref: '#/$defs/unit_score'
+
+      explainability:
+        $ref: '#/$defs/unit_score'
+
+      human_work_reduction:
+        $ref: '#/$defs/unit_score'
+
+      novelty:
+        $ref: '#/$defs/unit_score'
+
+      confidence:
+        $ref: '#/$defs/unit_score'
+
+      latency_ms:
+        type:
+          - integer
+          - "null"
+        minimum: 0
+        default: null
+
+      cost_estimate:
+        type:
+          - number
+          - "null"
+        minimum: 0
+        default: null
+
+  unit_score:
+    type: number
+    minimum: 0
+    maximum: 1
+
+  routing:
+    type: object
+    additionalProperties: false
+    required:
+      - expected
+      - actual
+      - matched
+    properties:
+      expected:
+        $ref: '#/$defs/route'
+
+      actual:
+        $ref: '#/$defs/route'
+
+      matched:
+        type: boolean
+
+      reason:
+        type:
+          - string
+          - "null"
+        default: null
+
+  route:
+    type: string
+    enum:
+      - AUTO
+      - REVIEW
+      - ESCALATE
+      - HOLD
+      - DENY
+
+  divergence:
+    type: object
+    additionalProperties: false
+    required:
+      - type
+      - expected
+      - actual
+      - severity
+      - summary
+    properties:
+      type:
+        type: string
+        enum:
+          - route
+          - output
+          - safety
+          - timing
+          - authority
+          - evidence
+          - other
+
+      expected:
+        type:
+          - string
+          - number
+          - integer
+          - boolean
+          - "null"
+
+      actual:
+        type:
+          - string
+          - number
+          - integer
+          - boolean
+          - "null"
+
+      severity:
+        type: string
+        enum:
+          - low
+          - medium
+          - high
+          - critical
+
+      summary:
+        type: string
+        minLength: 1
+
+  failure:
+    type: object
+    additionalProperties: false
+    required:
+      - code
+      - stage
+      - recoverable
+      - summary
+    properties:
+      code:
+        type: string
+        minLength: 1
+
+      stage:
+        type: string
+        minLength: 1
+
+      recoverable:
+        type: boolean
+
+      summary:
+        type: string
+        minLength: 1
+
+      evidence:
+        type:
+          - string
+          - "null"
+        default: null
+
+  grader:
+    type: object
+    additionalProperties: false
+    required:
+      - type
+      - name
+      - independent
+      - version
+    properties:
+      type:
+        type: string
+        enum:
+          - deterministic
+          - llm
+          - human
+          - hybrid
+
+      name:
+        type: string
+        minLength: 1
+
+      independent:
+        type: boolean
+
+      version:
+        type: string
+        minLength: 1
+
+      model:
+        type:
+          - string
+          - "null"
+        default: null
+
+      notes:
+        type:
+          - string
+          - "null"
+        default: null
+
+  verdict:
+    type: object
+    additionalProperties: false
+    required:
+      - status
+      - archive_recommendation
+      - reason
+    properties:
+      status:
+        type: string
+        enum:
+          - pass
+          - conditional_pass
+          - revise
+          - reject
+          - inconclusive
+
+      archive_recommendation:
+        type: string
+        enum:
+          - elite
+          - rare
+          - anomaly
+          - reject
+          - none
+
+      reason:
+        type: string
+        minLength: 1
+
+      required_changes:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        default: []
+
+  provenance:
+    type: object
+    additionalProperties: false
+    required:
+      - protocol_version
+      - scenario_generator_version
+      - recorded_at
+    properties:
+      protocol_version:
+        type: string
+        minLength: 1
+
+      scenario_generator_version:
+        type: string
+        minLength: 1
+
+      environment_version:
+        type:
+          - string
+          - "null"
+        default: null
+
+      recorded_at:
+        type: string
+        format: date-time
