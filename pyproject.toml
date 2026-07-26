@@ -23,4 +23,5 @@ packages = [
   "src.protocol",
   "src.simulation",
   "src.selection",
+  "src.routing",
 ]
