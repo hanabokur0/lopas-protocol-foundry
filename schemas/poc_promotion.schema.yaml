@@ -1,0 +1,327 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:lopas:protocol-foundry:poc-promotion:0.1.0
+title: LoPAS PoC Promotion Decision
+description: >
+  A decision record for moving a protocol candidate between controlled
+  validation levels. Promotion requires evidence; simulation alone is never
+  equivalent to real-world validation.
+type: object
+additionalProperties: false
+
+required:
+  - schema_version
+  - id
+  - protocol_candidate_ref
+  - decided_at
+  - current_level
+  - requested_next_level
+  - simulation_receipt_refs
+  - eligibility
+  - risk_assessment
+  - decision
+  - conditions
+  - approvals
+  - provenance
+
+properties:
+  schema_version:
+    const: 0.1.0
+
+  id:
+    type: string
+    pattern: '^poc-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  protocol_candidate_ref:
+    type: string
+    pattern: '^protocol-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  decided_at:
+    type: string
+    format: date-time
+
+  current_level:
+    $ref: '#/$defs/level'
+
+  requested_next_level:
+    $ref: '#/$defs/level'
+
+  simulation_receipt_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: '^simrcpt-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  evidence_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+    default: []
+
+  eligibility:
+    $ref: '#/$defs/eligibility'
+
+  risk_assessment:
+    $ref: '#/$defs/risk_assessment'
+
+  decision:
+    $ref: '#/$defs/decision'
+
+  conditions:
+    type: array
+    items:
+      $ref: '#/$defs/condition'
+    default: []
+
+  approvals:
+    type: array
+    items:
+      $ref: '#/$defs/approval'
+    default: []
+
+  provenance:
+    $ref: '#/$defs/provenance'
+
+$defs:
+  level:
+    type: integer
+    minimum: 0
+    maximum: 5
+
+  eligibility:
+    type: object
+    additionalProperties: false
+    required:
+      - eligible
+      - checks
+      - reasons
+    properties:
+      eligible:
+        type: boolean
+
+      checks:
+        type: object
+        additionalProperties: false
+        required:
+          - provenance_complete
+          - schema_valid
+          - simulation_coverage_sufficient
+          - authority_defined
+          - monitoring_defined
+          - rollback_defined
+          - human_review_satisfied
+        properties:
+          provenance_complete:
+            type: boolean
+
+          schema_valid:
+            type: boolean
+
+          simulation_coverage_sufficient:
+            type: boolean
+
+          authority_defined:
+            type: boolean
+
+          monitoring_defined:
+            type: boolean
+
+          rollback_defined:
+            type: boolean
+
+          human_review_satisfied:
+            type: boolean
+
+      reasons:
+        type: array
+        items:
+          type: string
+          minLength: 1
+
+  risk_assessment:
+    type: object
+    additionalProperties: false
+    required:
+      - external_impact
+      - reversibility
+      - data_sensitivity
+      - silent_failure_risk
+      - overall
+    properties:
+      external_impact:
+        $ref: '#/$defs/risk_level'
+
+      reversibility:
+        type: string
+        enum:
+          - high
+          - medium
+          - low
+          - unknown
+
+      data_sensitivity:
+        $ref: '#/$defs/risk_level'
+
+      silent_failure_risk:
+        $ref: '#/$defs/risk_level'
+
+      overall:
+        $ref: '#/$defs/risk_level'
+
+      mitigations:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        default: []
+
+  risk_level:
+    type: string
+    enum:
+      - low
+      - medium
+      - high
+      - critical
+      - unknown
+
+  decision:
+    type: object
+    additionalProperties: false
+    required:
+      - route
+      - reason
+      - archive
+    properties:
+      route:
+        type: string
+        enum:
+          - PROMOTE
+          - HOLD
+          - REVISE
+          - REJECT
+          - DENY
+
+      reason:
+        type: string
+        minLength: 1
+
+      archive:
+        type: string
+        enum:
+          - elite
+          - rare
+          - anomaly
+          - reject
+          - none
+
+      expires_at:
+        type:
+          - string
+          - "null"
+        format: date-time
+        default: null
+
+  condition:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - description
+      - blocking
+      - status
+    properties:
+      id:
+        type: string
+        pattern: '^condition-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+      description:
+        type: string
+        minLength: 1
+
+      blocking:
+        type: boolean
+
+      status:
+        type: string
+        enum:
+          - unmet
+          - met
+          - waived
+          - unknown
+
+      evidence_ref:
+        type:
+          - string
+          - "null"
+        default: null
+
+  approval:
+    type: object
+    additionalProperties: false
+    required:
+      - role
+      - status
+    properties:
+      role:
+        type: string
+        minLength: 1
+
+      approver_ref:
+        type:
+          - string
+          - "null"
+        default: null
+
+      status:
+        type: string
+        enum:
+          - requested
+          - approved
+          - rejected
+          - not_required
+
+      decided_at:
+        type:
+          - string
+          - "null"
+        format: date-time
+        default: null
+
+      note:
+        type:
+          - string
+          - "null"
+        default: null
+
+  provenance:
+    type: object
+    additionalProperties: false
+    required:
+      - decision_engine
+      - decision_engine_version
+      - recorded_by
+    properties:
+      decision_engine:
+        type: string
+        enum:
+          - rule
+          - human
+          - hybrid
+          - generated_test_fixture
+
+      decision_engine_version:
+        type: string
+        minLength: 1
+
+      recorded_by:
+        type: string
+        minLength: 1
+
+      rule_refs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        default: []
