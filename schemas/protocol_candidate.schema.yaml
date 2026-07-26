@@ -1,0 +1,527 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:lopas:protocol-foundry:protocol-candidate:0.1.0
+title: LoPAS Protocol Candidate
+description: >
+  A proposed reusable procedure derived from validated proxies. A candidate is
+  not active by default. Its lifecycle is controlled through intent,
+  simulation, routing, and explicit promotion.
+type: object
+additionalProperties: false
+
+required:
+  - schema_version
+  - id
+  - version
+  - created_at
+  - intent
+  - task
+  - proxy_refs
+  - trigger
+  - inputs
+  - preconditions
+  - steps
+  - routing
+  - stop_conditions
+  - outputs
+  - failure_handling
+  - safety
+  - activation
+  - provenance
+
+properties:
+  schema_version:
+    const: 0.1.0
+
+  id:
+    type: string
+    pattern: '^protocol-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  version:
+    type: string
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$'
+
+  created_at:
+    type: string
+    format: date-time
+
+  intent:
+    $ref: '#/$defs/intent'
+
+  task:
+    $ref: '#/$defs/task'
+
+  proxy_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: '^proxy-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  trigger:
+    $ref: '#/$defs/trigger'
+
+  inputs:
+    $ref: '#/$defs/inputs'
+
+  preconditions:
+    type: array
+    items:
+      $ref: '#/$defs/condition'
+    default: []
+
+  steps:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/$defs/step'
+
+  routing:
+    $ref: '#/$defs/routing'
+
+  stop_conditions:
+    type: array
+    items:
+      $ref: '#/$defs/condition'
+    default: []
+
+  outputs:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/$defs/output'
+
+  failure_handling:
+    $ref: '#/$defs/failure_handling'
+
+  safety:
+    $ref: '#/$defs/safety'
+
+  activation:
+    $ref: '#/$defs/activation'
+
+  provenance:
+    $ref: '#/$defs/provenance'
+
+$defs:
+  intent:
+    type: object
+    additionalProperties: false
+    required:
+      - status
+    properties:
+      status:
+        type: string
+        enum:
+          - unconfirmed
+          - confirmed
+          - rejected
+          - denied
+
+      requested_by:
+        type:
+          - string
+          - "null"
+        default: null
+
+      confirmation_refs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        default: []
+
+      note:
+        type:
+          - string
+          - "null"
+        default: null
+
+  task:
+    type: object
+    additionalProperties: false
+    required:
+      - type
+      - description
+    properties:
+      type:
+        type: string
+        minLength: 1
+
+      context:
+        type:
+          - string
+          - "null"
+        default: null
+
+      description:
+        type: string
+        minLength: 1
+
+  trigger:
+    type: object
+    additionalProperties: false
+    required:
+      - event
+      - conditions
+    properties:
+      event:
+        type: string
+        minLength: 1
+
+      conditions:
+        type: array
+        items:
+          $ref: '#/$defs/condition'
+        default: []
+
+  inputs:
+    type: object
+    additionalProperties: false
+    required:
+      - required
+      - optional
+    properties:
+      required:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+
+      optional:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+
+  condition:
+    type: object
+    additionalProperties: false
+    required:
+      - expression
+      - description
+    properties:
+      expression:
+        type: string
+        minLength: 1
+
+      description:
+        type: string
+        minLength: 1
+
+      on_unknown:
+        type: string
+        enum:
+          - HOLD
+          - REVIEW
+          - ESCALATE
+          - DENY
+        default: HOLD
+
+  step:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - action
+      - executor
+      - description
+      - on_failure
+    properties:
+      id:
+        type: string
+        pattern: '^step-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+      action:
+        type: string
+        minLength: 1
+
+      executor:
+        type: string
+        enum:
+          - rule
+          - llm
+          - tool
+          - human
+          - external_system
+          - hybrid
+
+      description:
+        type: string
+        minLength: 1
+
+      input_refs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        default: []
+
+      output_refs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        default: []
+
+      requires_human_confirmation:
+        type: boolean
+        default: false
+
+      on_failure:
+        type: string
+        enum:
+          - CONTINUE
+          - RETRY
+          - HOLD
+          - REVIEW
+          - ESCALATE
+          - ABORT
+          - DENY
+
+  routing:
+    type: object
+    additionalProperties: false
+    required:
+      - default
+      - rules
+    properties:
+      default:
+        $ref: '#/$defs/route'
+
+      rules:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - when
+            - route
+            - reason
+          properties:
+            when:
+              $ref: '#/$defs/condition'
+
+            route:
+              $ref: '#/$defs/route'
+
+            reason:
+              type: string
+              minLength: 1
+
+  route:
+    type: string
+    enum:
+      - AUTO
+      - REVIEW
+      - ESCALATE
+      - HOLD
+      - DENY
+
+  output:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - type
+    properties:
+      name:
+        type: string
+        minLength: 1
+
+      type:
+        type: string
+        minLength: 1
+
+      description:
+        type:
+          - string
+          - "null"
+        default: null
+
+      sensitive:
+        type: boolean
+        default: false
+
+  failure_handling:
+    type: object
+    additionalProperties: false
+    required:
+      - default_route
+      - retry_limit
+      - record_receipt
+    properties:
+      default_route:
+        $ref: '#/$defs/route'
+
+      retry_limit:
+        type: integer
+        minimum: 0
+        maximum: 10
+
+      record_receipt:
+        const: true
+
+      known_failures:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - code
+            - description
+            - route
+          properties:
+            code:
+              type: string
+              minLength: 1
+
+            description:
+              type: string
+              minLength: 1
+
+            route:
+              $ref: '#/$defs/route'
+        default: []
+
+  safety:
+    type: object
+    additionalProperties: false
+    required:
+      - external_impact
+      - reversibility
+      - authority_scope
+      - creative_ownership_signal
+      - personal_data_possible
+      - required_human_review
+    properties:
+      external_impact:
+        type: string
+        enum:
+          - low
+          - medium
+          - high
+          - unknown
+
+      reversibility:
+        type: string
+        enum:
+          - high
+          - medium
+          - low
+          - unknown
+
+      authority_scope:
+        type: string
+        enum:
+          - observe_only
+          - suggest
+          - draft
+          - execute_reversible
+          - execute_external
+          - unknown
+
+      creative_ownership_signal:
+        type:
+          - boolean
+          - "null"
+
+      personal_data_possible:
+        type:
+          - boolean
+          - "null"
+
+      required_human_review:
+        type: boolean
+
+      forbidden_actions:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        default: []
+
+  activation:
+    type: object
+    additionalProperties: false
+    required:
+      - required_observations
+      - required_source_diversity
+      - required_simulations
+      - human_confirmation
+    properties:
+      required_observations:
+        type: integer
+        minimum: 1
+
+      required_source_diversity:
+        type: integer
+        minimum: 1
+
+      required_simulations:
+        type: integer
+        minimum: 1
+
+      minimum_pass_rate:
+        type:
+          - number
+          - "null"
+        minimum: 0
+        maximum: 1
+        default: null
+
+      human_confirmation:
+        type: boolean
+
+  provenance:
+    type: object
+    additionalProperties: false
+    required:
+      - observation_refs
+      - proxy_refs
+      - generator
+    properties:
+      observation_refs:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          pattern: '^obs-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+      proxy_refs:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          pattern: '^proxy-[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+      generator:
+        type: string
+        enum:
+          - human
+          - rule
+          - llm
+          - hybrid
+          - generated_test_fixture
+
+      model:
+        type:
+          - string
+          - "null"
+        default: null
+
+      prompt_version:
+        type:
+          - string
+          - "null"
+        default: null
+
+      rule_version:
+        type:
+          - string
+          - "null"
+        default: null
