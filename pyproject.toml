@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lopas-protocol-foundry"
+version = "0.1.0"
+description = "Observation-to-protocol discovery and simulation reference implementation."
+requires-python = ">=3.11"
+dependencies = [
+  "PyYAML>=6.0",
+  "jsonschema[format]>=4.21",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[tool.setuptools]
+packages = [
+  "src",
+  "src.ingest",
+  "src.proxy",
+  "src.protocol",
+]
