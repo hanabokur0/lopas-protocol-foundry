@@ -1,0 +1,16 @@
+"""Errors raised by the integrated Foundry runner."""
+
+from __future__ import annotations
+
+
+class FoundryRunError(RuntimeError):
+    """Base error for integrated Foundry runs."""
+
+
+class FoundryStageError(FoundryRunError):
+    """A named Foundry stage failed."""
+
+    def __init__(self, stage: str, message: str) -> None:
+        super().__init__(f"{stage}: {message}")
+        self.stage = stage
+        self.message = message
