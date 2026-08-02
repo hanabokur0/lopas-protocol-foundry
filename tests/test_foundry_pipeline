@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import yaml
+
+from src.foundry.pipeline import run_full_foundry
+
+
+class FoundryPipelineTests(unittest.TestCase):
+    def _stage_results(self) -> tuple[SimpleNamespace, ...]:
+        ingest_result = SimpleNamespace(
+            is_valid=True,
+            invalid_records=[],
+            valid_records=[{"id": "obs-test-001"}],
+            receipt=lambda: {"stage": "ingest"},
+        )
+        proxy_result = SimpleNamespace(
+            proxies=[{"id": "proxy-test-001"}],
+            receipt=lambda: {"stage": "proxy"},
+        )
+        protocol_result = SimpleNamespace(
+            candidates=[{"id": "protocol-test-001"}],
+            receipt=lambda: {"stage": "protocol"},
+        )
+        simulation_result = SimpleNamespace(
+            run_id="run-test-001",
+            receipts=[{"id": "simrcpt-test-001"}],
+            stage_receipt=lambda: {"stage": "simulation"},
+        )
+        selection_result = SimpleNamespace(
+            document={
+                "id": "selection-test-001",
+                "results": [{"protocol_candidate_ref": "protocol-test-001"}],
+            },
+            stage_receipt=lambda: {"stage": "selection"},
+        )
+        routing_result = SimpleNamespace(
+            promotions=[
+                {
+                    "id": "poc-test-001",
+                    "protocol_candidate_ref": "protocol-test-001",
+                    "decision": {"route": "HOLD"},
+                }
+            ],
+            stage_receipt=lambda: {"stage": "routing"},
+        )
+        return (
+            ingest_result,
+            proxy_result,
+            protocol_result,
+            simulation_result,
+            selection_result,
+            routing_result,
+        )
+
+    def _stage_patches(self, results: tuple[SimpleNamespace, ...]):
+        (
+            ingest_result,
+            proxy_result,
+            protocol_result,
+            simulation_result,
+            selection_result,
+            routing_result,
+        ) = results
+        return (
+            patch("src.foundry.pipeline.ingest_file", return_value=ingest_result),
+            patch("src.foundry.pipeline.build_proxies", return_value=proxy_result),
+            patch(
+                "src.foundry.pipeline.build_protocol_candidates",
+                return_value=protocol_result,
+            ),
+            patch(
+                "src.foundry.pipeline.run_simulation",
+                return_value=simulation_result,
+            ),
+            patch(
+                "src.foundry.pipeline.run_selection",
+                return_value=selection_result,
+            ),
+            patch(
+                "src.foundry.pipeline.run_routing",
+                return_value=routing_result,
+            ),
+        )
+
+    def test_all_existing_stages_are_composed_in_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input.yaml"
+            source.write_text("- id: obs-test-001\n", encoding="utf-8")
+
+            patches = self._stage_patches(self._stage_results())
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+                result = run_full_foundry(source, root / "run")
+
+            self.assertEqual(
+                result.manifest["completed_stages"],
+                ["ingest", "proxy", "protocol", "simulation", "selection", "routing"],
+            )
+            self.assertEqual(result.manifest["summary"]["promotion_routes"], {"HOLD": 1})
+            self.assertEqual(result.action_receipts, [])
+            manifest = yaml.safe_load(result.paths.manifest.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "success")
+
+    def test_optional_shadow_stage_is_part_of_same_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input.yaml"
+            source.write_text("- id: obs-test-001\n", encoding="utf-8")
+            bindings = root / "bindings.yaml"
+            bindings.write_text("schema_version: 0.1.0\nbindings: {}\n", encoding="utf-8")
+            output = root / "run"
+            execution_result = SimpleNamespace(
+                receipts=[
+                    {
+                        "status": "blocked",
+                        "decision": {"route": "HOLD", "reasons": ["test"]},
+                    }
+                ]
+            )
+            written = {
+                "plans": output.resolve() / "07_execution_plans.yaml",
+                "receipts": output.resolve() / "07_action_receipts.yaml",
+                "stage_receipt": output.resolve() / "07_execution_stage_receipt.yaml",
+            }
+
+            patches = self._stage_patches(self._stage_results())
+            with (
+                patches[0],
+                patches[1],
+                patches[2],
+                patches[3],
+                patches[4],
+                patches[5],
+                patch(
+                    "src.execution.pipeline.run_shadow_execution",
+                    return_value=execution_result,
+                ),
+                patch(
+                    "src.execution.pipeline.write_execution_outputs",
+                    return_value=written,
+                ),
+            ):
+                result = run_full_foundry(
+                    source,
+                    output,
+                    shadow_bindings_path=bindings,
+                )
+
+            self.assertEqual(result.manifest["completed_stages"][-1], "execution")
+            self.assertEqual(result.manifest["summary"]["execution_routes"], {"HOLD": 1})
+            self.assertEqual(result.manifest["summary"]["execution_statuses"], {"blocked": 1})
+            self.assertEqual(result.action_receipts, execution_result.receipts)
+
+
+if __name__ == "__main__":
+    unittest.main()
