@@ -1,0 +1,135 @@
+"""Deterministic gate between PoC Promotion and controlled execution."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+
+MODE_LEVELS = {
+    "shadow": 3,
+    "live_reversible": 4,
+}
+
+
+@dataclass(frozen=True)
+class GateDecision:
+    """A conservative execution-gate decision."""
+
+    route: str
+    reasons: tuple[str, ...]
+
+    @property
+    def ready(self) -> bool:
+        return self.route == "READY"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"route": self.route, "reasons": list(self.reasons)}
+
+
+
+def evaluate_gate(
+    candidate: dict[str, Any],
+    promotion: dict[str, Any] | None,
+    *,
+    mode: str = "shadow",
+) -> GateDecision:
+    """Require explicit promotion, confirmation, and a sufficient level.
+
+    Unknown or missing evidence routes to HOLD. Explicit denial or rejection
+    routes to DENY. The gate never converts uncertainty into permission.
+    """
+
+    if mode not in MODE_LEVELS:
+        raise ValueError(f"unsupported execution mode: {mode}")
+
+    reasons: list[str] = []
+    candidate_id = candidate.get("id")
+    intent_status = candidate.get("intent", {}).get("status")
+
+    if intent_status == "denied":
+        return GateDecision("DENY", ("candidate_intent_denied",))
+    if intent_status == "rejected":
+        return GateDecision("DENY", ("candidate_intent_rejected",))
+    if intent_status != "confirmed":
+        reasons.append("candidate_not_confirmed")
+
+    if promotion is None:
+        reasons.append("promotion_missing")
+        return GateDecision("HOLD", tuple(reasons))
+
+    if promotion.get("protocol_candidate_ref") != candidate_id:
+        reasons.append("promotion_candidate_mismatch")
+
+    decision_route = promotion.get("decision", {}).get("route")
+    if decision_route in {"DENY", "REJECT"}:
+        return GateDecision(
+            "DENY",
+            tuple(reasons + [f"promotion_{str(decision_route).lower()}"]),
+        )
+    if decision_route != "PROMOTE":
+        reasons.append(f"promotion_route_{str(decision_route).lower()}")
+
+    eligibility = promotion.get("eligibility", {})
+    eligible = eligibility.get("eligible")
+    if eligible is not True:
+        reasons.append("promotion_not_eligible")
+    checks = eligibility.get("checks", {})
+    if isinstance(checks, dict):
+        for check_name, passed in sorted(checks.items()):
+            if passed is not True:
+                reasons.append(f"promotion_check_failed:{check_name}")
+    else:
+        reasons.append("promotion_checks_unknown")
+
+    for condition in promotion.get("conditions", []):
+        if not isinstance(condition, dict) or condition.get("blocking") is not True:
+            continue
+        status = condition.get("status")
+        if status not in {"met", "waived"}:
+            condition_id = condition.get("id", "unknown")
+            reasons.append(f"blocking_condition_{status}:{condition_id}")
+
+    for approval in promotion.get("approvals", []):
+        if not isinstance(approval, dict):
+            reasons.append("approval_unknown")
+            continue
+        status = approval.get("status")
+        role = approval.get("role", "unknown")
+        if status == "rejected":
+            return GateDecision(
+                "DENY",
+                tuple(reasons + [f"approval_rejected:{role}"]),
+            )
+        if status == "requested":
+            reasons.append(f"approval_pending:{role}")
+
+    requested_level = promotion.get("requested_next_level")
+    required_level = MODE_LEVELS[mode]
+    if not isinstance(requested_level, int):
+        reasons.append("promotion_level_unknown")
+    elif requested_level < required_level:
+        reasons.append(
+            f"promotion_level_{requested_level}_below_{mode}_level_{required_level}"
+        )
+
+    safety = candidate.get("safety", {})
+    forbidden_actions = set(safety.get("forbidden_actions", []))
+    for step in candidate.get("steps", []):
+        action = step.get("action") if isinstance(step, dict) else None
+        if action in forbidden_actions:
+            reasons.append(f"declared_action_forbidden:{action}")
+
+    authority_scope = safety.get("authority_scope")
+    if authority_scope in {None, "", "unknown"}:
+        reasons.append("authority_scope_unknown")
+
+    if mode == "live_reversible":
+        if safety.get("reversibility") not in {"high", "medium"}:
+            reasons.append("reversibility_insufficient")
+        if safety.get("external_impact") in {"high", "critical", "unknown", None}:
+            reasons.append("external_impact_too_high_or_unknown")
+
+    if reasons:
+        return GateDecision("HOLD", tuple(dict.fromkeys(reasons)))
+    return GateDecision("READY", ())
