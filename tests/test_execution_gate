@@ -1,0 +1,132 @@
+from __future__ import annotations
+
+import unittest
+
+from src.execution.compiler import compile_shadow_plan
+from src.execution.gate import evaluate_gate
+from src.execution.registry import Binding, BindingRegistry
+
+
+def candidate(status: str = "confirmed") -> dict:
+    return {
+        "id": "protocol-test-001",
+        "intent": {"status": status},
+        "inputs": {"required": ["request"], "optional": []},
+        "steps": [
+            {
+                "id": "step-001",
+                "action": "inspect_request",
+                "executor": "rule",
+                "input_refs": ["request"],
+                "output_refs": ["assessment"],
+                "requires_human_confirmation": False,
+                "on_failure": "HOLD",
+            }
+        ],
+        "safety": {
+            "authority_scope": "draft",
+            "external_impact": "low",
+            "reversibility": "high",
+        },
+    }
+
+
+def promotion(route: str = "PROMOTE", level: int = 3) -> dict:
+    return {
+        "id": "poc-test-001",
+        "protocol_candidate_ref": "protocol-test-001",
+        "requested_next_level": level,
+        "eligibility": {
+            "eligible": route == "PROMOTE",
+            "checks": {"schema_valid": route == "PROMOTE"},
+        },
+        "conditions": [],
+        "approvals": [],
+        "decision": {"route": route},
+    }
+
+
+class ExecutionGateTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.registry = BindingRegistry(
+            bindings={
+                "inspect_request": Binding(
+                    action="inspect_request",
+                    adapter="rule.inspect.v1",
+                    enabled=True,
+                    config={},
+                )
+            },
+            manifest_version="test-0.1.0",
+        )
+
+    def test_unconfirmed_candidate_holds(self) -> None:
+        decision = evaluate_gate(candidate("unconfirmed"), promotion())
+        self.assertEqual(decision.route, "HOLD")
+        self.assertIn("candidate_not_confirmed", decision.reasons)
+
+    def test_rejected_promotion_denies(self) -> None:
+        decision = evaluate_gate(candidate(), promotion("REJECT"))
+        self.assertEqual(decision.route, "DENY")
+
+
+    def test_unmet_blocking_condition_holds(self) -> None:
+        promoted = promotion()
+        promoted["conditions"] = [
+            {
+                "id": "condition-review",
+                "blocking": True,
+                "status": "unmet",
+            }
+        ]
+        decision = evaluate_gate(candidate(), promoted)
+        self.assertEqual(decision.route, "HOLD")
+        self.assertIn(
+            "blocking_condition_unmet:condition-review",
+            decision.reasons,
+        )
+
+    def test_rejected_approval_denies(self) -> None:
+        promoted = promotion()
+        promoted["approvals"] = [
+            {"role": "protocol_owner", "status": "rejected"}
+        ]
+        decision = evaluate_gate(candidate(), promoted)
+        self.assertEqual(decision.route, "DENY")
+        self.assertIn("approval_rejected:protocol_owner", decision.reasons)
+
+    def test_ready_shadow_plan_has_no_external_effect(self) -> None:
+        plan = compile_shadow_plan(
+            candidate(),
+            promotion(),
+            self.registry,
+            input_values={"request": {"id": "synthetic"}},
+        )
+        self.assertEqual(plan["gate"]["route"], "READY")
+        self.assertFalse(plan["external_effects_permitted"])
+        self.assertEqual(plan["steps"][0]["external_effect"], "none")
+
+    def test_missing_binding_holds(self) -> None:
+        empty = BindingRegistry(bindings={}, manifest_version="test")
+        plan = compile_shadow_plan(
+            candidate(),
+            promotion(),
+            empty,
+            input_values={"request": {}},
+        )
+        self.assertEqual(plan["gate"]["route"], "HOLD")
+        self.assertIn("binding_missing:inspect_request", plan["gate"]["reasons"])
+
+    def test_missing_required_input_holds(self) -> None:
+        plan = compile_shadow_plan(
+            candidate(),
+            promotion(),
+            self.registry,
+            input_values={},
+        )
+        self.assertEqual(plan["gate"]["route"], "HOLD")
+        self.assertIn("required_input_missing:request", plan["gate"]["reasons"])
+
+
+if __name__ == "__main__":
+    unittest.main()
