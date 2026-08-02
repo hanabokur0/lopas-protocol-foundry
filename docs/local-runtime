@@ -1,0 +1,117 @@
+# Integrated Local Runtime
+
+## What this adds
+
+The repository already contains executable stage-local pipelines for Ingest,
+Proxy, Protocol, Simulation, Selection, and Routing. This patch adds two thin
+layers without duplicating their rules:
+
+1. `src.foundry`: one-process orchestration across all implemented stages;
+2. `src.execution`: a conservative Promotion-to-Shadow boundary.
+
+```text
+Observation input
+→ Ingest
+→ Proxy
+→ Protocol Candidate
+→ Simulation Receipt
+→ Selection Result
+→ PoC Promotion
+→ Shadow Execution Plan
+→ Action Receipt
+```
+
+## One-command run
+
+```bash
+python -m src.foundry \
+  examples/idea_observations/input.jsonl \
+  --output-dir receipts/full_run \
+  --scenario-count 30 \
+  --current-level 2 \
+  --next-level 3 \
+  --shadow-bindings examples/full_run/adapter_bindings.yaml \
+  --execution-inputs examples/full_run/execution_inputs.yaml
+```
+
+Without `--shadow-bindings`, the same command stops after PoC Promotion.
+`python -m src.execution` remains available when the execution boundary should
+be rerun against already-generated candidates and promotions.
+
+## Important semantics
+
+A completed Foundry run may legitimately end with `HOLD`, `REVISE`, `REJECT`,
+or `DENY`. A shadow plan may likewise be `blocked` or `denied`. These are valid
+pipeline outputs, not runtime crashes.
+
+The execution boundary independently verifies:
+
+- matching candidate and promotion references;
+- confirmed candidate intent;
+- `PROMOTE` decision and eligible status;
+- all declared promotion checks;
+- blocking conditions and approval status;
+- a validation level sufficient for shadow mode;
+- known authority scope;
+- required execution inputs;
+- enabled action-to-adapter bindings;
+- absence of a step action explicitly listed as forbidden.
+
+Missing or unknown information becomes `HOLD`. Explicit denial, rejection, or
+a rejected approval becomes `DENY`.
+
+## Artifacts
+
+The integrated command writes:
+
+```text
+00_run_manifest.yaml
+01_observations.yaml
+01_ingest_receipt.yaml
+02_proxies.yaml
+02_proxy_receipt.yaml
+03_protocol_candidates.yaml
+03_protocol_receipt.yaml
+04_simulation_receipts.yaml
+04_simulation_stage_receipt.yaml
+05_selection_results.yaml
+05_selection_stage_receipt.yaml
+06_poc_promotions.yaml
+06_routing_stage_receipt.yaml
+07_execution_plans.yaml          # when --shadow-bindings is supplied
+07_action_receipts.yaml          # when --shadow-bindings is supplied
+07_execution_stage_receipt.yaml  # when --shadow-bindings is supplied
+```
+
+The manifest is updated after every completed stage and records the failed
+stage if a stage cannot produce its contract.
+
+## Why shadow first
+
+The first runtime does not call tools, LLMs, humans, APIs, or external systems.
+It resolves bindings, checks inputs, describes the steps that would run, and
+writes a complete no-side-effect receipt. This establishes the contract needed
+before adding reversible live adapters.
+
+## Exit behavior
+
+By default, a run with zero `READY` candidates still exits successfully because
+`HOLD` is an expected governance result. Add `--require-shadow-ready` in CI when
+a fixture is specifically expected to cross the shadow gate.
+
+## Immediate compatibility fixture
+
+To verify only the Promotion-to-Shadow boundary:
+
+```bash
+python -m src.execution \
+  examples/full_run/shadow_ready_candidates.yaml \
+  examples/full_run/shadow_ready_promotions.yaml \
+  examples/full_run/adapter_bindings.yaml \
+  --inputs examples/full_run/execution_inputs.yaml \
+  --output-dir receipts/shadow_ready \
+  --require-ready
+```
+
+This fixture is intentionally synthetic and should produce exactly one
+`shadowed` receipt with `READY` and no external effects.
