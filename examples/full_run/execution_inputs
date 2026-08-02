@@ -1,0 +1,6 @@
+- protocol_candidate_ref: protocol-customer-support-llm-001
+  values:
+    support_request:
+      request_id: synthetic-request-001
+      status: open
+      message: Please review the attached synthetic request.
