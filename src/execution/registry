@@ -1,0 +1,74 @@
+"""Adapter binding manifest loader.
+
+The shadow runtime resolves declared actions to registered adapter identifiers,
+but it never invokes those adapters. Unknown or disabled bindings become HOLD.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from .errors import BindingManifestError
+
+
+@dataclass(frozen=True)
+class Binding:
+    action: str
+    adapter: str
+    enabled: bool
+    config: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class BindingRegistry:
+    bindings: dict[str, Binding]
+    manifest_version: str
+
+    def get(self, action: str) -> Binding | None:
+        return self.bindings.get(action)
+
+
+
+def load_binding_registry(path: str | Path) -> BindingRegistry:
+    source = Path(path).resolve()
+    try:
+        document = yaml.safe_load(source.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise BindingManifestError(str(exc)) from exc
+
+    if not isinstance(document, dict):
+        raise BindingManifestError("binding manifest must be a mapping")
+    if document.get("schema_version") != "0.1.0":
+        raise BindingManifestError("binding manifest schema_version must be 0.1.0")
+
+    raw_bindings = document.get("bindings")
+    if not isinstance(raw_bindings, dict) or not raw_bindings:
+        raise BindingManifestError("bindings must be a non-empty mapping")
+
+    parsed: dict[str, Binding] = {}
+    for action, raw in raw_bindings.items():
+        if not isinstance(action, str) or not action.strip():
+            raise BindingManifestError("binding action names must be non-empty strings")
+        if not isinstance(raw, dict):
+            raise BindingManifestError(f"binding {action!r} must be a mapping")
+        adapter = raw.get("adapter")
+        if not isinstance(adapter, str) or not adapter.strip():
+            raise BindingManifestError(f"binding {action!r} needs an adapter")
+        config = raw.get("config", {})
+        if not isinstance(config, dict):
+            raise BindingManifestError(f"binding {action!r} config must be a mapping")
+        parsed[action] = Binding(
+            action=action,
+            adapter=adapter,
+            enabled=raw.get("enabled", True) is True,
+            config=config,
+        )
+
+    return BindingRegistry(
+        bindings=parsed,
+        manifest_version=str(document.get("manifest_version", "0.1.0")),
+    )
