@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""Install the integrated Foundry/Shadow runtime into a repository checkout."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+import shutil
+import sys
+
+
+PATCH_ROOT = Path(__file__).resolve().parent
+REQUIRED_STAGE_PACKAGES = (
+    "src/ingest",
+    "src/proxy",
+    "src/protocol",
+    "src/simulation",
+    "src/selection",
+    "src/routing",
+)
+PAYLOADS = (
+    "src/foundry",
+    "src/execution",
+    "schemas/adapter_manifest.schema.yaml",
+    "schemas/execution_plan.schema.yaml",
+    "schemas/action_receipt.schema.yaml",
+    "docs/local-runtime.md",
+    "examples/full_run",
+    "tests/test_execution_gate.py",
+    "tests/test_execution_pipeline.py",
+    "tests/test_foundry_pipeline.py",
+    "README_RUNTIME_SECTION.md",
+    "VALIDATION.md",
+)
+PACKAGE_ENTRIES = ("src.foundry", "src.execution")
+
+
+class InstallError(RuntimeError):
+    pass
+
+
+def _same_bytes(left: Path, right: Path) -> bool:
+    return left.is_file() and right.is_file() and left.read_bytes() == right.read_bytes()
+
+
+def _copy_file(source: Path, target: Path, *, force: bool, dry_run: bool) -> None:
+    if target.exists() and not _same_bytes(source, target) and not force:
+        raise InstallError(
+            f"refusing to overwrite changed file: {target} (use --force)"
+        )
+    print(f"copy {source.relative_to(PATCH_ROOT)} -> {target}")
+    if dry_run:
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+
+
+def _copy_payload(relative: str, repo: Path, *, force: bool, dry_run: bool) -> None:
+    source = PATCH_ROOT / relative
+    if source.is_dir():
+        for child in sorted(source.rglob("*")):
+            if not child.is_file() or "__pycache__" in child.parts:
+                continue
+            target = repo / child.relative_to(PATCH_ROOT)
+            _copy_file(child, target, force=force, dry_run=dry_run)
+        return
+    _copy_file(source, repo / relative, force=force, dry_run=dry_run)
+
+
+def _updated_pyproject(text: str) -> str:
+    missing = [entry for entry in PACKAGE_ENTRIES if f'"{entry}"' not in text]
+    if not missing:
+        return text
+
+    lines = text.splitlines(keepends=True)
+    in_setuptools = False
+    in_packages = False
+    closing_index: int | None = None
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_setuptools = stripped == "[tool.setuptools]"
+            in_packages = False
+            continue
+        if in_setuptools and stripped.startswith("packages") and "[" in stripped:
+            in_packages = True
+            if "]" in stripped:
+                raise InstallError(
+                    "inline [tool.setuptools].packages is unsupported; add package entries manually"
+                )
+            continue
+        if in_setuptools and in_packages and stripped == "]":
+            closing_index = index
+            break
+
+    if closing_index is None:
+        raise InstallError(
+            "could not locate multiline [tool.setuptools].packages in pyproject.toml"
+        )
+
+    insertion = [f'  "{entry}",\n' for entry in missing]
+    lines[closing_index:closing_index] = insertion
+    return "".join(lines)
+
+
+def _update_pyproject(repo: Path, *, dry_run: bool) -> None:
+    pyproject = repo / "pyproject.toml"
+    if not pyproject.is_file():
+        raise InstallError(f"missing pyproject.toml: {pyproject}")
+    original = pyproject.read_text(encoding="utf-8")
+    updated = _updated_pyproject(original)
+    if updated == original:
+        print("pyproject.toml already contains runtime packages")
+        return
+    print("update pyproject.toml package list")
+    if dry_run:
+        return
+    backup = repo / "pyproject.toml.runtime-patch.bak"
+    if not backup.exists():
+        backup.write_text(original, encoding="utf-8")
+    pyproject.write_text(updated, encoding="utf-8")
+
+
+def install(repo: Path, *, force: bool, dry_run: bool) -> None:
+    repo = repo.resolve()
+    missing = [relative for relative in REQUIRED_STAGE_PACKAGES if not (repo / relative).is_dir()]
+    if missing:
+        raise InstallError(
+            "target does not look like lopas-protocol-foundry; missing: "
+            + ", ".join(missing)
+        )
+    for relative in PAYLOADS:
+        _copy_payload(relative, repo, force=force, dry_run=dry_run)
+    _update_pyproject(repo, dry_run=dry_run)
+    print("runtime patch installed" if not dry_run else "dry run complete")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("repository", type=Path)
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        install(args.repository, force=args.force, dry_run=args.dry_run)
+    except InstallError as exc:
+        print(f"install error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
