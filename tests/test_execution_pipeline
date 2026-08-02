@@ -1,0 +1,159 @@
+from __future__ import annotations
+
+from pathlib import Path
+import tempfile
+import unittest
+
+import yaml
+
+from src.execution.errors import ExecutionInputError
+from src.execution.pipeline import run_shadow_execution
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _promotion(candidate_id: str) -> dict:
+    return {
+        "schema_version": "0.1.0",
+        "id": "poc-customer-support-llm-001",
+        "protocol_candidate_ref": candidate_id,
+        "decided_at": "2026-08-03T01:00:00Z",
+        "current_level": 2,
+        "requested_next_level": 3,
+        "simulation_receipt_refs": ["simrcpt-test-001"],
+        "evidence_refs": ["evidence-test-001"],
+        "eligibility": {
+            "eligible": True,
+            "checks": {
+                "provenance_complete": True,
+                "schema_valid": True,
+                "simulation_coverage_sufficient": True,
+                "authority_defined": True,
+                "monitoring_defined": True,
+                "rollback_defined": True,
+                "human_review_satisfied": True,
+            },
+            "reasons": [],
+        },
+        "risk_assessment": {
+            "external_impact": "medium",
+            "reversibility": "high",
+            "data_sensitivity": "medium",
+            "silent_failure_risk": "medium",
+            "overall": "medium",
+            "mitigations": ["shadow mode only"],
+        },
+        "decision": {
+            "route": "PROMOTE",
+            "reason": "Synthetic Level 3 compatibility test.",
+            "archive": "elite",
+            "expires_at": None,
+        },
+        "conditions": [],
+        "approvals": [
+            {
+                "role": "protocol_owner",
+                "approver_ref": "human-test-001",
+                "status": "approved",
+                "decided_at": "2026-08-03T01:00:00Z",
+                "note": "Synthetic test approval.",
+            }
+        ],
+        "provenance": {
+            "decision_engine": "generated_test_fixture",
+            "decision_engine_version": "test-0.1.0",
+            "recorded_by": "runtime-compatibility-test",
+            "rule_refs": ["shadow-level-3"],
+        },
+    }
+
+
+class ExecutionPipelineTests(unittest.TestCase):
+    def _fixture_paths(self, root: Path) -> tuple[Path, Path, Path, Path]:
+        candidate = yaml.safe_load(
+            (REPO_ROOT / "examples/sample_run/03_protocol_candidate.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        candidate["intent"]["status"] = "confirmed"
+        candidate["intent"]["confirmation_refs"] = ["approval-test-001"]
+
+        candidates = root / "candidates.yaml"
+        promotions = root / "promotions.yaml"
+        bindings = root / "bindings.yaml"
+        inputs = root / "inputs.yaml"
+        candidates.write_text(
+            yaml.safe_dump([candidate], sort_keys=False), encoding="utf-8"
+        )
+        promotions.write_text(
+            yaml.safe_dump([_promotion(candidate["id"])], sort_keys=False),
+            encoding="utf-8",
+        )
+        bindings.write_text(
+            yaml.safe_dump(
+                {
+                    "schema_version": "0.1.0",
+                    "manifest_version": "test-bindings-0.1.0",
+                    "bindings": {
+                        "assess_request_completeness": {
+                            "adapter": "rule.support_request_completeness.v1"
+                        },
+                        "generate_support_draft": {
+                            "adapter": "llm.support_draft.v1"
+                        },
+                        "request_human_review": {
+                            "adapter": "human.review_queue.v1"
+                        },
+                    },
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        inputs.write_text(
+            yaml.safe_dump(
+                [
+                    {
+                        "protocol_candidate_ref": candidate["id"],
+                        "values": {"support_request": {"id": "synthetic"}},
+                    }
+                ],
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        return candidates, promotions, bindings, inputs
+
+    def test_current_schemas_reach_ready_without_side_effects(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self._fixture_paths(Path(temp_dir))
+            result = run_shadow_execution(
+                paths[0], paths[1], paths[2], inputs_path=paths[3]
+            )
+
+        self.assertEqual(result.plans[0]["gate"]["route"], "READY")
+        self.assertFalse(result.plans[0]["external_effects_permitted"])
+        self.assertEqual(result.receipts[0]["status"], "shadowed")
+        self.assertEqual(result.receipts[0]["external_effects"], [])
+
+    def test_duplicate_promotions_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            candidates, promotions, bindings, inputs = self._fixture_paths(root)
+            promotion = yaml.safe_load(promotions.read_text(encoding="utf-8"))[0]
+            promotions.write_text(
+                yaml.safe_dump([promotion, promotion], sort_keys=False),
+                encoding="utf-8",
+            )
+            with self.assertRaises(ExecutionInputError):
+                run_shadow_execution(
+                    candidates,
+                    promotions,
+                    bindings,
+                    inputs_path=inputs,
+                )
+
+
+if __name__ == "__main__":
+    unittest.main()
