@@ -1,0 +1,250 @@
+"""Promotion-to-shadow execution pipeline."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from src.ingest.loader import load_records
+from src.ingest.pipeline import write_yaml
+from src.ingest.validator import load_validator, validate_records
+
+from .compiler import COMPILER_VERSION, compile_shadow_plan
+from .errors import ExecutionInputError, ExecutionOutputValidationError
+from .registry import BindingRegistry, load_binding_registry
+
+
+EXECUTION_PIPELINE_VERSION = "execution-pipeline-0.1.0"
+
+
+@dataclass(frozen=True)
+class ExecutionResult:
+    candidates_path: Path
+    promotions_path: Path
+    bindings_path: Path
+    plans: list[dict[str, Any]]
+    receipts: list[dict[str, Any]]
+
+    def stage_receipt(self) -> dict[str, Any]:
+        statuses: dict[str, int] = {}
+        routes: dict[str, int] = {}
+        for receipt in self.receipts:
+            status = receipt["status"]
+            route = receipt["decision"]["route"]
+            statuses[status] = statuses.get(status, 0) + 1
+            routes[route] = routes.get(route, 0) + 1
+        return {
+            "schema_version": "0.1.0",
+            "receipt_type": "shadow_execution_run",
+            "recorded_at": _iso_now(),
+            "versions": {
+                "pipeline": EXECUTION_PIPELINE_VERSION,
+                "compiler": COMPILER_VERSION,
+            },
+            "counts": {
+                "candidates": len(self.plans),
+                "plans": len(self.plans),
+                "action_receipts": len(self.receipts),
+            },
+            "statuses": dict(sorted(statuses.items())),
+            "routes": dict(sorted(routes.items())),
+            "external_effects": 0,
+            "status": "success",
+        }
+
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+        "+00:00", "Z"
+    )
+
+
+
+def _receipt_id(candidate_id: str) -> str:
+    return f"actionrcpt-{candidate_id.removeprefix('protocol-')}"
+
+
+
+def _default_schema(name: str) -> Path:
+    return Path(__file__).resolve().parents[2] / "schemas" / name
+
+
+
+def _load_input_values(path: str | Path | None) -> dict[str, dict[str, Any]]:
+    if path is None:
+        return {}
+    records = load_records(Path(path).resolve())
+    result: dict[str, dict[str, Any]] = {}
+    for record in records:
+        candidate_ref = record.get("protocol_candidate_ref")
+        values = record.get("values")
+        if not isinstance(candidate_ref, str) or not isinstance(values, dict):
+            raise ExecutionInputError(
+                "each execution input needs protocol_candidate_ref and values"
+            )
+        if candidate_ref in result:
+            raise ExecutionInputError(
+                f"duplicate execution input for {candidate_ref}"
+            )
+        result[candidate_ref] = values
+    return result
+
+
+
+def _validate_documents(
+    documents: list[dict[str, Any]],
+    schema_path: Path,
+    label: str,
+) -> None:
+    validator = load_validator(schema_path)
+    _, _, issues = validate_records(documents, validator)
+    if issues:
+        detail = "; ".join(f"{issue.path}: {issue.message}" for issue in issues)
+        raise ExecutionOutputValidationError(f"{label}: {detail}")
+
+
+
+def run_shadow_execution(
+    candidates_path: str | Path,
+    promotions_path: str | Path,
+    bindings_path: str | Path,
+    *,
+    inputs_path: str | Path | None = None,
+    candidate_schema_path: str | Path | None = None,
+    promotion_schema_path: str | Path | None = None,
+    plan_schema_path: str | Path | None = None,
+    action_receipt_schema_path: str | Path | None = None,
+) -> ExecutionResult:
+    """Compile all candidates into shadow plans; never invoke adapters."""
+
+    candidate_file = Path(candidates_path).resolve()
+    promotion_file = Path(promotions_path).resolve()
+    binding_file = Path(bindings_path).resolve()
+
+    candidates = load_records(candidate_file)
+    promotions = load_records(promotion_file)
+    registry: BindingRegistry = load_binding_registry(binding_file)
+    input_values = _load_input_values(inputs_path)
+
+    candidate_schema = (
+        Path(candidate_schema_path).resolve()
+        if candidate_schema_path
+        else _default_schema("protocol_candidate.schema.yaml")
+    )
+    promotion_schema = (
+        Path(promotion_schema_path).resolve()
+        if promotion_schema_path
+        else _default_schema("poc_promotion.schema.yaml")
+    )
+    plan_schema = (
+        Path(plan_schema_path).resolve()
+        if plan_schema_path
+        else _default_schema("execution_plan.schema.yaml")
+    )
+    action_schema = (
+        Path(action_receipt_schema_path).resolve()
+        if action_receipt_schema_path
+        else _default_schema("action_receipt.schema.yaml")
+    )
+
+    _validate_documents(candidates, candidate_schema, "protocol candidates")
+    _validate_documents(promotions, promotion_schema, "PoC promotions")
+
+    candidate_ids: set[str] = set()
+    for candidate in candidates:
+        candidate_id = candidate["id"]
+        if candidate_id in candidate_ids:
+            raise ExecutionInputError(f"duplicate protocol candidate: {candidate_id}")
+        candidate_ids.add(candidate_id)
+
+    promotion_by_candidate: dict[str, dict[str, Any]] = {}
+    for promotion in promotions:
+        candidate_ref = promotion["protocol_candidate_ref"]
+        if candidate_ref in promotion_by_candidate:
+            raise ExecutionInputError(
+                f"duplicate PoC promotion for protocol candidate: {candidate_ref}"
+            )
+        promotion_by_candidate[candidate_ref] = promotion
+    plans: list[dict[str, Any]] = []
+    receipts: list[dict[str, Any]] = []
+
+    for candidate in candidates:
+        promotion = promotion_by_candidate.get(candidate["id"])
+        plan = compile_shadow_plan(
+            candidate,
+            promotion,
+            registry,
+            input_values=input_values.get(candidate["id"], {}),
+        )
+        plans.append(plan)
+
+        route = plan["gate"]["route"]
+        status = {
+            "READY": "shadowed",
+            "HOLD": "blocked",
+            "DENY": "denied",
+        }[route]
+        steps = []
+        for planned in plan["steps"]:
+            step_status = "would_execute" if route == "READY" else "not_run"
+            steps.append(
+                {
+                    "step_ref": planned["step_ref"],
+                    "action": planned["action"],
+                    "adapter": planned["adapter"],
+                    "status": step_status,
+                    "external_effect": "none",
+                }
+            )
+
+        receipt = {
+            "schema_version": "0.1.0",
+            "id": _receipt_id(candidate["id"]),
+            "recorded_at": _iso_now(),
+            "mode": "shadow",
+            "protocol_candidate_ref": candidate["id"],
+            "poc_promotion_ref": promotion.get("id") if promotion else None,
+            "execution_plan_ref": plan["id"],
+            "status": status,
+            "decision": plan["gate"],
+            "steps": steps,
+            "external_effects": [],
+            "artifacts": [],
+            "provenance": {
+                "pipeline_version": EXECUTION_PIPELINE_VERSION,
+                "compiler_version": COMPILER_VERSION,
+                "binding_manifest_version": registry.manifest_version,
+            },
+        }
+        receipts.append(receipt)
+
+    _validate_documents(plans, plan_schema, "execution plans")
+    _validate_documents(receipts, action_schema, "action receipts")
+    return ExecutionResult(
+        candidates_path=candidate_file,
+        promotions_path=promotion_file,
+        bindings_path=binding_file,
+        plans=plans,
+        receipts=receipts,
+    )
+
+
+
+def write_execution_outputs(
+    result: ExecutionResult,
+    output_dir: str | Path,
+) -> dict[str, Path]:
+    root = Path(output_dir).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    paths = {
+        "plans": root / "07_execution_plans.yaml",
+        "receipts": root / "07_action_receipts.yaml",
+        "stage_receipt": root / "07_execution_stage_receipt.yaml",
+    }
+    write_yaml(paths["plans"], result.plans)
+    write_yaml(paths["receipts"], result.receipts)
+    write_yaml(paths["stage_receipt"], result.stage_receipt())
+    return paths
