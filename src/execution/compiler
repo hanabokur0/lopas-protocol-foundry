@@ -1,0 +1,97 @@
+"""Compile promoted Protocol Candidates into inspectable shadow plans."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any
+
+from .gate import GateDecision, evaluate_gate
+from .registry import BindingRegistry
+
+
+COMPILER_VERSION = "execution-compiler-0.1.0"
+
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+        "+00:00", "Z"
+    )
+
+
+
+def _plan_id(candidate_id: str) -> str:
+    return f"execplan-{candidate_id.removeprefix('protocol-')}"
+
+
+
+def compile_shadow_plan(
+    candidate: dict[str, Any],
+    promotion: dict[str, Any] | None,
+    registry: BindingRegistry,
+    *,
+    input_values: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Create a no-side-effect plan and collect all deterministic blockers."""
+
+    values = input_values or {}
+    gate = evaluate_gate(candidate, promotion, mode="shadow")
+    reasons = list(gate.reasons)
+
+    required_inputs = candidate.get("inputs", {}).get("required", [])
+    missing_inputs = [name for name in required_inputs if name not in values]
+    reasons.extend(f"required_input_missing:{name}" for name in missing_inputs)
+
+    planned_steps: list[dict[str, Any]] = []
+    for index, step in enumerate(candidate.get("steps", [])):
+        action = step.get("action")
+        binding = registry.get(action) if isinstance(action, str) else None
+        if binding is None:
+            reasons.append(f"binding_missing:{action}")
+            adapter = None
+            binding_enabled = False
+        else:
+            adapter = binding.adapter
+            binding_enabled = binding.enabled
+            if not binding.enabled:
+                reasons.append(f"binding_disabled:{action}")
+
+        planned_steps.append(
+            {
+                "sequence": index + 1,
+                "step_ref": step.get("id"),
+                "action": action,
+                "declared_executor": step.get("executor"),
+                "adapter": adapter,
+                "binding_enabled": binding_enabled,
+                "input_refs": list(step.get("input_refs", [])),
+                "output_refs": list(step.get("output_refs", [])),
+                "requires_human_confirmation": bool(
+                    step.get("requires_human_confirmation", False)
+                ),
+                "on_failure": step.get("on_failure"),
+                "mode": "shadow",
+                "external_effect": "none",
+            }
+        )
+
+    final_gate = gate
+    if reasons and gate.route == "READY":
+        final_gate = GateDecision("HOLD", tuple(dict.fromkeys(reasons)))
+    elif reasons and gate.route == "HOLD":
+        final_gate = GateDecision("HOLD", tuple(dict.fromkeys(reasons)))
+
+    return {
+        "schema_version": "0.1.0",
+        "id": _plan_id(candidate["id"]),
+        "compiled_at": _iso_now(),
+        "mode": "shadow",
+        "protocol_candidate_ref": candidate["id"],
+        "poc_promotion_ref": promotion.get("id") if promotion else None,
+        "compiler_version": COMPILER_VERSION,
+        "gate": final_gate.as_dict(),
+        "required_inputs": list(required_inputs),
+        "provided_input_refs": sorted(values),
+        "steps": planned_steps,
+        "external_effects_permitted": False,
+    }
