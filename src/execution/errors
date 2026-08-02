@@ -1,0 +1,19 @@
+"""Execution-stage errors."""
+
+from __future__ import annotations
+
+
+class ExecutionError(RuntimeError):
+    """Base execution error."""
+
+
+class BindingManifestError(ExecutionError):
+    """The adapter binding manifest is invalid."""
+
+
+class ExecutionInputError(ExecutionError):
+    """Execution input documents are invalid."""
+
+
+class ExecutionOutputValidationError(ExecutionError):
+    """Generated execution documents failed schema validation."""
