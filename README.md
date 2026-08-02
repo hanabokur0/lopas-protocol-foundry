@@ -1,26 +1,26 @@
 # LoPAS Protocol Foundry
 
-LoPAS Protocol Foundry is an **experimental, incomplete reference implementation** for turning fragmented observations into traceable protocol candidates, testing them against explicit scenarios, and deciding whether they are safe and useful enough to enter a controlled proof of concept.
+LoPAS Protocol Foundry is an **experimental local runtime for turning fragmented observations into traceable Protocol Candidates, testing them against explicit scenarios, selecting and routing them through conservative promotion gates, and compiling qualified candidates into no-side-effect Shadow Execution Plans and Action Receipts.**
 
 ```text
 Observation
+→ Ingest
 → Proxy
 → Protocol Candidate
-→ Scenario Suite
-→ Simulation
-→ Independent Grading
+→ Simulation and Independent Grading
 → Selection
 → PoC Promotion
-→ Receipt
+→ Shadow Execution Plan
+→ Action Receipt
 → ProtocolMemory
 ```
 
 Raw observations are materials, not instructions.
 
-The Foundry does not treat a post, complaint, meeting note, idea, or workaround as an executable workflow. It first converts the source material into an inspectable candidate with explicit inputs, conditions, routes, safety boundaries, provenance, and failure behavior.
+The Foundry does not treat a post, complaint, meeting note, idea, or workaround as an executable workflow. It first converts source material into an inspectable candidate with explicit inputs, conditions, routes, safety boundaries, provenance, activation requirements, and failure behavior.
 
-> **Project status:** v0.1 design-first prototype.  
-> The schemas, prompt contracts, and one sample trace are the most developed parts. The repository is **not yet a complete end-to-end runtime**, stable CLI, production service, or autonomous executor.
+> **Project status: v0.1 local Foundry runtime.**  
+> The repository contains executable stage-local pipelines, an integrated local runner, deterministic Selection and Routing, and a conservative Promotion-to-Shadow boundary. It is **not** a production service, autonomous executor, or live external-action runtime.
 
 ---
 
@@ -41,19 +41,21 @@ Distributed observations
 → reusable structure
 → candidate workflows
 → scenario-based evaluation
+→ evidence-aware promotion
 → limited and reversible PoC
 ```
 
-The goal is not to ask an LLM for one “best idea.” The goal is to build a pipeline that can eventually:
+The goal is not to ask an LLM for one “best idea.” The goal is to provide a pipeline that can:
 
 - preserve source evidence separately from interpretation;
-- normalize repeated friction into reusable proxies;
-- generate explicit protocol candidates rather than hidden instructions;
-- test candidates under normal, boundary, adversarial, and failure conditions;
-- compare expected behavior with simulated behavior;
+- normalize repeated friction into reusable Proxies;
+- generate explicit Protocol Candidates rather than hidden instructions;
+- test candidates under nominal, boundary, adversarial, and failure conditions;
+- compare expected behavior with simulated actual behavior;
 - preserve strong, unusual, anomalous, and rejected candidates;
 - promote only qualified candidates toward controlled real-world testing;
-- record transformations and decisions as receipts.
+- stop safely when evidence, authority, approval, or bindings are incomplete;
+- record meaningful transformations and decisions as receipts.
 
 Simulation is not proof of real-world effectiveness. A generated protocol remains a candidate until it passes explicit promotion gates.
 
@@ -61,26 +63,35 @@ Simulation is not proof of real-world effectiveness. A generated protocol remain
 
 ## Current Scope
 
-### Present and inspectable
+### Implemented and inspectable
 
 - versioned YAML schemas for the major stage boundaries;
-- prompt specifications for Proxy Generation, Protocol Generation, Scenario Generation, and Independent Grading;
-- one manually inspectable end-to-end sample trace;
-- early implementation and module scaffolding under `src/`.
+- deterministic local Ingest, Proxy, Protocol, Simulation, Selection, and Routing stages;
+- synthetic scenario generation and independent grading inside the Simulation stage;
+- stage-local command-line interfaces;
+- one-process orchestration through `python -m src.foundry`;
+- Selection archives for `elite`, `rare`, `anomaly`, and `reject`;
+- evidence-aware PoC promotion decisions;
+- an optional Promotion-to-Shadow execution boundary;
+- Adapter Binding validation without invoking adapters;
+- Shadow Execution Plans and Action Receipts with zero external effects;
+- a manually inspectable sample trace;
+- a synthetic Level 3 READY fixture;
+- regression tests for the integrated runner and execution gate.
 
-### Incomplete or still changing
+### Not implemented as production capability
 
-- a stable command-line interface;
-- complete executable coverage for every stage;
-- cross-schema and regression tests;
-- domain-specific example suites;
-- historical replay and shadow-mode execution;
-- production source adapters;
-- complete Selection and Routing workflows;
-- full architecture, safety, and PoC lifecycle documentation;
-- production integrations and autonomous external execution.
+- live Adapter invocation;
+- autonomous external execution;
+- production source integrations;
+- a human-review console;
+- a hosted API or stable SDK;
+- complete historical replay infrastructure across real operational logs;
+- production-grade secrets, identity, authorization, and tenancy;
+- ProtocolMemory feedback automation;
+- guarantees that simulation predicts real-world performance.
 
-Interfaces, filenames, and runtime behavior may change during v0.1. The schemas and receipts are intended to become the stable boundaries, but they should not yet be treated as frozen public APIs.
+Interfaces, filenames, schemas, and runtime behavior may still change during v0.1.
 
 ---
 
@@ -89,63 +100,233 @@ Interfaces, filenames, and runtime behavior may change during v0.1. The schemas 
 ```mermaid
 flowchart LR
     A[Raw Observations] --> B[Ingest]
-    B --> C[Observation]
+    B --> C[Validated Observations]
     C --> D[Proxy Generation]
-    D --> E[Proxy Validation]
-    E --> F[Protocol Candidate]
-    F --> G[Scenario Suite]
-    G --> H[Simulation]
-    H --> I[Simulation Record / Receipt]
-    I --> J[Independent Grading]
-    J --> K{Selection}
-    K --> L[Elite]
-    K --> M[Rare]
-    K --> N[Anomaly]
-    K --> O[Reject]
-    L --> P[PoC Promotion Gate]
-    M --> P
-    N --> Q[Investigation Queue]
-    P --> R[Shadow Test / Limited PoC]
-    R --> S[Action Receipt]
-    S --> T[ProtocolMemory]
+    D --> E[Protocol Candidate]
+    E --> F[Scenario Generation]
+    F --> G[Deterministic Simulation]
+    G --> H[Independent Grading]
+    H --> I[Simulation Receipts]
+    I --> J{Selection}
+    J --> K[Elite]
+    J --> L[Rare]
+    J --> M[Anomaly]
+    J --> N[Reject]
+    K --> O[PoC Promotion Gate]
+    L --> O
+    M --> P[Investigation Queue]
+    O --> Q{Execution Gate}
+    Q --> R[Blocked / Denied]
+    Q --> S[Shadow Execution Plan]
+    S --> T[Action Receipt]
+    T --> U[ProtocolMemory]
 ```
 
-This diagram describes the intended architecture. Not every arrow is currently implemented as an executable stage.
+The executable local path currently reaches the Shadow boundary. Shadow mode describes and records what would execute, but does not call tools, LLMs, humans, APIs, or external systems.
+
+---
+
+## Quick Start
+
+### Requirements
+
+- Python 3.11 or later
+- PyYAML
+- jsonschema with format support
+
+Install the project locally:
+
+```bash
+python -m pip install -e .
+```
+
+Run the tests:
+
+```bash
+python -m unittest \
+  tests.test_execution_gate \
+  tests.test_execution_pipeline \
+  tests.test_foundry_pipeline -v
+```
+
+---
+
+## Integrated Local Runtime
+
+Run every implemented Foundry stage in one receipt-preserving process:
+
+```bash
+python -m src.foundry \
+  <observation-input.yaml> \
+  --output-dir receipts/full_run \
+  --scenario-count 30 \
+  --current-level 2 \
+  --next-level 3
+```
+
+Add the optional Shadow boundary:
+
+```bash
+python -m src.foundry \
+  <observation-input.yaml> \
+  --output-dir receipts/full_run \
+  --scenario-count 30 \
+  --current-level 2 \
+  --next-level 3 \
+  --shadow-bindings examples/full_run/adapter_bindings.yaml \
+  --execution-inputs examples/full_run/execution_inputs.yaml
+```
+
+Without `--shadow-bindings`, the run stops after PoC Promotion.
+
+A completed run may legitimately end with `HOLD`, `REVISE`, `REJECT`, or `DENY`. A Shadow Plan may likewise be `blocked` or `denied`. These are valid governance results, not runtime crashes.
+
+Use `--require-shadow-ready` only when a fixture or CI job is specifically expected to produce at least one `READY` result.
+
+---
+
+## Shadow Execution Boundary
+
+The execution stage can be rerun independently against existing candidates and promotions:
+
+```bash
+python -m src.execution \
+  receipts/full_run/03_protocol_candidates.yaml \
+  receipts/full_run/06_poc_promotions.yaml \
+  examples/full_run/adapter_bindings.yaml \
+  --inputs examples/full_run/execution_inputs.yaml \
+  --output-dir receipts/full_run
+```
+
+The execution gate independently verifies:
+
+- the Promotion references the same Protocol Candidate;
+- candidate intent is explicitly `confirmed`;
+- the promotion decision is `PROMOTE`;
+- promotion eligibility and all declared checks are true;
+- the requested next level is at least Level 3;
+- blocking conditions are met or waived;
+- no approval is pending or rejected;
+- authority scope is known;
+- required execution inputs are present;
+- every action has an enabled Adapter Binding;
+- no step action is explicitly forbidden.
+
+Missing or unknown information becomes `HOLD`. Explicit rejection, denial, or rejected approval becomes `DENY`.
+
+Even when the gate returns `READY`, Shadow mode:
+
+- does not invoke the bound Adapter;
+- does not perform external actions;
+- records each step with `external_effect: none`;
+- emits `external_effects: []`;
+- writes an Action Receipt with status `shadowed`.
+
+---
+
+## Immediate READY Fixture
+
+The included synthetic fixture verifies the Promotion-to-Shadow boundary independently of upstream generation:
+
+```bash
+python -m src.execution \
+  examples/full_run/shadow_ready_candidates.yaml \
+  examples/full_run/shadow_ready_promotions.yaml \
+  examples/full_run/adapter_bindings.yaml \
+  --inputs examples/full_run/execution_inputs.yaml \
+  --output-dir receipts/shadow_ready \
+  --require-ready
+```
+
+Expected result:
+
+```text
+route: READY
+status: shadowed
+external_effects: []
+```
+
+This fixture is validation material, not production evidence.
+
+---
+
+## Generated Artifacts
+
+An integrated run writes:
+
+```text
+00_run_manifest.yaml
+01_observations.yaml
+01_ingest_receipt.yaml
+02_proxies.yaml
+02_proxy_receipt.yaml
+03_protocol_candidates.yaml
+03_protocol_receipt.yaml
+04_simulation_receipts.yaml
+04_simulation_stage_receipt.yaml
+05_selection_results.yaml
+05_selection_stage_receipt.yaml
+06_poc_promotions.yaml
+06_routing_stage_receipt.yaml
+07_execution_plans.yaml          # with --shadow-bindings
+07_action_receipts.yaml          # with --shadow-bindings
+07_execution_stage_receipt.yaml  # with --shadow-bindings
+```
+
+The top-level manifest is updated after each completed stage. If a stage cannot produce its declared contract, the manifest records the failed stage and error.
 
 ---
 
 ## Stage Responsibilities
 
-### Observation
+### Observation and Ingest
 
-A source-grounded record of something that happened, was proposed, failed, repeated, was avoided, or remained unresolved.
+An Observation is a source-grounded record of something that happened, was proposed, failed, repeated, was avoided, or remained unresolved.
 
-Possible sources include public posts, GitHub issues, meeting notes, support logs, incident reports, operator notes, and manually entered cases.
+The Ingest stage accepts structured documents in:
 
-An Observation is evidence-bearing input. It is not yet a recommendation or protocol.
+- `.jsonl` / `.ndjson`;
+- `.json`;
+- `.yaml` / `.yml`.
+
+It validates each record against `schemas/observation.schema.yaml`. Invalid records are never silently mixed into validated output.
+
+```bash
+python -m src.ingest \
+  <observation-input.jsonl> \
+  --output receipts/observations.yaml
+```
+
+An Observation is evidence-bearing input. It is not yet a recommendation or executable protocol.
 
 ### Proxy
 
-A normalized intermediate representation that separates reusable structure from the source wording.
+A Proxy is a normalized intermediate representation that separates reusable structure from source wording.
 
-A Proxy may describe:
+The deterministic v0.1 baseline records:
 
 - task type;
 - friction;
-- affected actor;
-- expected effect;
-- evidence density;
+- affected actors;
+- expected effects;
+- evidence density and confidence;
 - external impact;
 - reversibility;
 - uncertainty;
-- generalizability;
+- constraints and risk hints;
 - provenance references.
 
-The Proxy is the translation layer between raw observations and protocol design.
+```bash
+python -m src.proxy \
+  receipts/observations.yaml \
+  --output receipts/proxies.yaml
+```
+
+Every interpretation remains labeled as interpretation.
 
 ### Protocol Candidate
 
-A proposed reusable procedure with explicit:
+The Protocol stage groups validated Proxies and creates unconfirmed Protocol Candidates with explicit:
 
 - triggers and trigger conditions;
 - required and optional inputs;
@@ -160,72 +341,116 @@ A proposed reusable procedure with explicit:
 - provenance;
 - activation requirements.
 
-A generated candidate is not automatically active.
+```bash
+python -m src.protocol \
+  receipts/proxies.yaml \
+  --output receipts/protocol_candidates.yaml
+```
 
-### Scenario Suite
+Every generated candidate begins with:
 
-A set of test propositions declared before simulation.
+```yaml
+intent:
+  status: unconfirmed
+```
 
-Scenarios may cover:
+The default route is never silently treated as authorization for live execution.
+
+### Scenario Generation, Simulation, and Independent Grading
+
+The Simulation stage generates synthetic scenarios from validated Protocol Candidates, evaluates declared routing behavior without external tools, and emits schema-valid Simulation Receipts.
+
+```bash
+python -m src.simulation \
+  receipts/protocol_candidates.yaml \
+  --output receipts/simulation_receipts.yaml
+```
+
+The deterministic baseline covers applicable cases such as:
 
 - nominal behavior;
 - missing or unknown inputs;
-- boundary values;
-- conflicting routing rules;
+- false and unsupported conditions;
+- human-review boundaries;
+- routing rules and route conflicts;
+- stop conditions;
+- known failures;
 - forbidden actions;
-- authority withdrawal;
-- privacy and ownership boundaries;
 - stale context;
-- silent factual or completion failures;
-- under-escalation and overblocking;
-- adversarial instruction attempts.
+- under-escalation and overblocking.
 
-A scenario defines expected behavior. It does not fabricate the Simulator’s actual result.
+Route precedence is conservative:
 
-### Simulation
+```text
+DENY > ESCALATE > HOLD > REVIEW > AUTO
+```
 
-The Simulator applies a Protocol Candidate to a declared scenario and records actual behavior.
+Unsupported expressions route to `HOLD` and are recorded as failures.
 
-The output should be structured and inspectable rather than a free-form opinion. Simulation may reveal implementation mismatch, candidate defects, missing guards, or insufficient evidence.
-
-### Independent Grading
-
-The Independent Grader compares:
-
-- the candidate contract;
-- the scenario’s predeclared expectation;
-- the Simulator’s actual output;
-- safety invariants and permitted evidence.
-
-Its role is to separate likely causes of failure, including:
-
-- Protocol Candidate defect;
-- Simulator defect;
-- Scenario defect;
-- missing safety guard;
-- insufficient evidence;
-- ambiguous or unsupported evaluation.
-
-The grader does not activate a candidate or perform external execution.
+The Independent Grader compares the candidate contract, predeclared expectation, simulated actual behavior, and safety invariants. It does not activate the candidate.
 
 ### Selection
 
-The intended Selection stage does not preserve only one overall winner.
+The Selection stage aggregates Simulation Receipts while keeping performance, diversity, and unusual behavior as separate signals.
+
+```bash
+python -m src.selection \
+  receipts/simulation_receipts.yaml \
+  --output receipts/selection_results.yaml
+```
 
 | Archive | Purpose |
 |---|---|
-| `elite` | Strong overall performance |
-| `rare` | Coherent behavior that differs materially from existing candidates |
-| `anomaly` | Unusually strong, weak, or inconsistent behavior under specific conditions |
-| `reject` | Unsafe, invalid, unsupported, or consistently ineffective |
+| `elite` | Strong aggregate performance with sufficient coverage |
+| `rare` | Coherent behavior that is materially distant from existing candidates |
+| `anomaly` | Scenario-specific variation or unsupported behavior requiring study |
+| `reject` | Unsafe, invalid, unsupported, or critically divergent behavior |
 
-This is intended to prevent conventional candidates from crowding out unusual designs that may be useful in narrow environments.
+`reject` is exclusive and takes precedence. A candidate may be both `elite` and `rare`.
 
-### PoC Promotion
+### PoC Promotion and Routing
+
+The Routing stage combines:
+
+- validated Protocol Candidates;
+- Selection Results;
+- optional real-world Evidence Manifests;
+
+and emits one `poc_promotion` decision per candidate.
+
+```bash
+python -m src.routing \
+  receipts/protocol_candidates.yaml \
+  receipts/selection_results.yaml \
+  --output receipts/poc_promotions.yaml
+```
+
+Selection performance alone is not enough for promotion. The router rechecks:
+
+- archive membership;
+- observation count;
+- verified source diversity;
+- simulation count;
+- acceptable simulation rate;
+- critical divergences;
+- authority scope;
+- monitoring;
+- rollback or containment;
+- human approval.
+
+Without evidence for required gates, the candidate remains on `HOLD`. This is intentional.
+
+### Shadow Execution
+
+The Shadow stage compiles eligible candidates into inspectable plans using registered action-to-Adapter bindings.
+
+It does not call the Adapter. It proves that the candidate can or cannot cross the current execution boundary and records why.
+
+---
+
+## Promotion Ladder
 
 Simulation is not proof.
-
-The planned promotion ladder is:
 
 | Level | Stage |
 |---:|---|
@@ -236,7 +461,7 @@ The planned promotion ladder is:
 | 4 | Limited and reversible PoC |
 | 5 | Monitored operation |
 
-Promotion decisions are represented by `poc_promotion` documents. The full promotion runtime is not yet complete.
+The current integrated execution boundary supports Level 3 Shadow compilation. Levels 4 and 5 require future live Adapter infrastructure, operational controls, and explicit accountable ownership.
 
 ---
 
@@ -246,12 +471,17 @@ Promotion decisions are represented by `poc_promotion` documents. The full promo
 lopas-protocol-foundry/
 ├─ README.md
 ├─ LICENSE
+├─ pyproject.toml
+│
 ├─ schemas/
 │  ├─ observation.schema.yaml
 │  ├─ proxy.schema.yaml
 │  ├─ protocol_candidate.schema.yaml
 │  ├─ simulation_receipt.schema.yaml
-│  └─ poc_promotion.schema.yaml
+│  ├─ poc_promotion.schema.yaml
+│  ├─ adapter_manifest.schema.yaml
+│  ├─ execution_plan.schema.yaml
+│  └─ action_receipt.schema.yaml
 │
 ├─ src/
 │  ├─ ingest/
@@ -259,7 +489,9 @@ lopas-protocol-foundry/
 │  ├─ protocol/
 │  ├─ simulation/
 │  ├─ selection/
-│  └─ routing/
+│  ├─ routing/
+│  ├─ foundry/
+│  └─ execution/
 │
 ├─ prompts/
 │  ├─ proxy_generation.md
@@ -268,63 +500,64 @@ lopas-protocol-foundry/
 │  └─ independent_grader.md
 │
 ├─ examples/
-│  └─ sample_run/
+│  ├─ sample_run/
+│  └─ full_run/
+│
+├─ docs/
+│  └─ local-runtime.md
 │
 ├─ receipts/
-├─ tests/
-└─ docs/# planned; not yet added
-
+└─ tests/
+   ├─ test_foundry_pipeline.py
+   ├─ test_execution_gate.py
+   └─ test_execution_pipeline.py
 ```
-
-### Directory status
-
-| Path | Role | v0.1 status |
-|---|---|---|
-| `schemas/` | Contracts between pipeline stages | Present; still subject to revision |
-| `prompts/` | LLM generation and grading specifications | Present |
-| `examples/sample_run/` | One inspectable end-to-end trace | Present |
-| `src/` | Local runtime modules | Partial and uneven by stage |
-| `receipts/` | Generated or archived run artifacts | Incomplete |
-| `tests/` | Schema, regression, parity, and safety tests | Not yet complete |
-| `docs/` | Architecture, safety, and lifecycle documentation | Planned or incomplete |
-| domain examples | Meeting, support, and observation-specific cases | Not yet complete |
 
 ---
 
-## Sample Run
+## Examples
 
-See:
+### `examples/sample_run/`
+
+A manually inspectable synthetic trace that preserves disagreement rather than hiding it:
 
 ```text
-examples/sample_run/
+Observation
+→ Proxy
+→ Protocol Candidate
+→ Scenario Suite
+→ Simulation Record
+→ Independent Grade
+→ Simulation Receipt
 ```
 
-The sample is intended to demonstrate how identifiers, provenance, expectations, simulated actuals, grading, and receipts connect across stages.
+The sample exposes a stale-context gap: the candidate returns `REVIEW`, while the independent safety expectation is `HOLD`. The Grader identifies the missing guard and rejects that candidate version.
 
-It is a reference trace, not evidence that:
+The point is not that simulation proves a real workflow unsafe. The point is that the Foundry can preserve provenance, expose a missing guard, attribute the gap, and leave an inspectable receipt.
 
-- the candidate works in production;
-- LLM simulation predicts real-world outcomes;
-- the complete runtime is implemented;
-- the protocol is authorized for activation;
-- the current schemas are final.
+### `examples/full_run/`
 
-A useful sample run should make disagreement visible. For example, the Simulator may follow a candidate’s declared default route while the Independent Grader identifies a missing freshness, authority, privacy, or policy guard.
+Fixtures and binding manifests for:
+
+- the integrated local runtime;
+- independent reruns of the Shadow boundary;
+- a synthetic confirmed and promoted Level 3 candidate;
+- verification that `READY` still produces zero external effects.
 
 ---
 
 ## Prompt Contracts
 
-The prompt files are stage-local specifications:
+The prompt files remain stage-local specifications:
 
 | Prompt | Input | Output |
 |---|---|---|
 | `proxy_generation.md` | validated Observation material | Proxy document |
 | `protocol_generation.md` | validated Proxy material | Protocol Candidate |
 | `scenario_generation.md` | one validated Protocol Candidate | Scenario Suite |
-| `independent_grader.md` | candidate, scenario expectation, and simulated actuals | independent grade |
+| `independent_grader.md` | candidate, expectation, and simulated actuals | Independent Grade |
 
-Each prompt is intended to:
+The prompts are intended to:
 
 - constrain the model’s role;
 - define allowed inputs and outputs;
@@ -333,7 +566,7 @@ Each prompt is intended to:
 - emit schema-oriented YAML;
 - keep deterministic validation outside the model where possible.
 
-The prompts are specifications, not proof that every runtime stage currently invokes them automatically.
+The deterministic v0.1 runtime does not depend on an LLM being trusted as an execution authority.
 
 ---
 
@@ -345,32 +578,33 @@ Source evidence and model interpretation must remain distinguishable.
 
 ### Candidates before execution
 
-Generated protocols begin as candidates. Activation requires explicit promotion.
+Generated protocols begin as candidates. Activation requires explicit confirmation and promotion.
 
 ### Receipts everywhere
 
 Meaningful transformations should record:
 
 - input references;
-- schema, rule, prompt, and model versions;
+- schema, rule, prompt, model, and pipeline versions;
 - output identifiers;
 - validation results;
 - failures and divergences;
 - routing decisions;
 - timestamps;
-- promotion status.
+- promotion status;
+- execution-boundary decisions.
 
 ### Deterministic boundaries
 
-LLMs may propose structure, but schemas, validation, route precedence, safety gates, and promotion thresholds should be deterministic whenever possible.
+LLMs may propose structure, but schemas, validation, route precedence, safety gates, promotion thresholds, and Adapter Binding checks should be deterministic whenever possible.
 
 ### Independent expectations
 
-Scenario expectations should not simply copy the candidate’s default route. Independent safety expectations are needed to reveal missing guards.
+Scenario expectations should not simply copy the candidate’s default route. Independent safety expectations are required to expose missing guards.
 
 ### Diversity, not only ranking
 
-The system should retain unusual but coherent candidates instead of optimizing solely for average performance.
+The system preserves unusual but coherent candidates rather than optimizing only for average performance.
 
 ### Reversible first
 
@@ -378,37 +612,45 @@ Early PoCs should prefer low-impact, observable, bounded, and reversible operati
 
 ### Unknown means hold
 
-Missing evidence or unresolved contradictions should route to `HOLD`, `REVIEW`, `ESCALATE`, or `DENY` rather than silent automation.
+Missing evidence or unresolved contradictions route to `HOLD`, `REVIEW`, `ESCALATE`, or `DENY` rather than silent automation.
+
+### A blocked run is still a result
+
+A conservative system proves its value partly by refusing to cross a boundary without sufficient evidence, authority, inputs, approval, or bindings.
 
 ---
 
 ## Safety Boundaries
 
-A candidate should not be promoted when:
+A candidate should not be promoted or compiled into a Shadow Plan when:
 
 - provenance is missing or fabricated;
 - evidence and interpretation cannot be separated;
+- candidate intent is unconfirmed;
 - required inputs or authority are unknown;
 - the route exceeds declared authority;
 - external impact is high and reversibility is low;
 - required human review is absent or bypassed;
 - policy, privacy, legal, rights, or ownership ambiguity is unresolved;
 - simulation coverage is inadequate;
+- critical divergences remain unresolved;
+- monitoring or rollback requirements are missing;
+- approvals are pending or rejected;
 - failures may remain silent;
 - the candidate depends on invented facts;
+- an Adapter Binding is absent or disabled;
 - a success-looking output is incomplete, stale, or unsafe.
 
-The intended status behavior is conservative:
+The intended behavior is conservative:
 
 ```text
-unconfirmed           → awaiting confirmation
-confirmed             → eligible for controlled activation
-rejected              → rejected
-denied                → denied
-insufficient evidence → hold
+unconfirmed           → HOLD
+confirmed + qualified → eligible for controlled promotion
+rejected              → DENY / REJECT
+insufficient evidence → HOLD
+missing binding       → HOLD
+rejected approval     → DENY
 ```
-
-See `docs/safety-model.md` when that document is completed.
 
 ---
 
@@ -423,9 +665,10 @@ LoPAS Protocol Foundry is not:
 - a system for copying individual creators’ work;
 - a way to bypass consent, policy, review, or responsibility;
 - a universal optimizer that produces one correct workflow;
-- a stable SDK or hosted service in its current form.
+- a live Adapter runtime in its current form;
+- a stable hosted service or frozen SDK.
 
-It is an experimental protocol discovery, evaluation, and promotion layer.
+It is an experimental protocol discovery, evaluation, promotion, and safe Shadow-compilation layer.
 
 ---
 
@@ -437,51 +680,78 @@ Recommended practice:
 - minimize personal and confidential data;
 - preserve source identifiers and timestamps;
 - distinguish quotation, summary, interpretation, and inference;
-- record model, rule, schema, and prompt versions;
+- record model, rule, schema, prompt, and pipeline versions;
 - maintain deletion, exclusion, and authority-withdrawal paths;
 - never invent source references or historical outcomes;
-- avoid promotion based on one weak observation.
+- avoid promotion based on one weak observation;
+- keep synthetic fixtures clearly labeled as synthetic;
+- keep Action Receipts separate from claims of real-world execution.
 
 Future source adapters should emit the common Observation schema so downstream stages remain independent of the original platform.
 
 ---
 
+## Validation
+
+The integrated runtime additions are covered by deterministic tests for:
+
+- conservative execution-gate behavior;
+- missing bindings and required inputs;
+- rejected approvals and promotion decisions;
+- schema-compatible Level 3 READY compilation;
+- zero-external-effect Shadow output;
+- duplicate promotion rejection;
+- ordered composition of all existing Foundry stages;
+- the optional Shadow stage inside the same run.
+
+The included runtime validation set contains 11 passing tests.
+
+This does not constitute production validation or proof of real-world effectiveness.
+
+---
+
 ## Roadmap
 
-### v0.1 — Local Foundry
+### v0.1 — Local Foundry and Shadow Boundary
 
 - [x] Core YAML schemas
-- [x] Proxy Generation prompt
-- [x] Protocol Generation prompt
-- [x] Scenario Generation prompt
-- [x] Independent Grader prompt
-- [x] One end-to-end sample trace
-- [ ] Cross-schema validation tests
-- [ ] Valid and invalid fixture sets
-- [ ] Stable local CLI
-- [ ] Complete executable path across all stages
-- [ ] Deterministic simulation and grader regression coverage
-- [ ] Selection and routing regression tests
-- [ ] Domain-specific example suites
-- [ ] Complete architecture, safety, and PoC lifecycle docs
+- [x] Deterministic Ingest stage
+- [x] Deterministic Proxy stage
+- [x] Deterministic Protocol Candidate stage
+- [x] Synthetic Scenario and Simulation stage
+- [x] Independent grading
+- [x] Selection archives and scoring
+- [x] Evidence-aware PoC Routing
+- [x] Stage-local CLIs
+- [x] Integrated one-process Foundry runner
+- [x] Shadow Execution Plans
+- [x] Action Receipts with zero external effects
+- [x] Sample trace
+- [x] Synthetic Level 3 READY fixture
+- [x] Integrated runtime and execution-gate tests
+- [ ] Broader cross-schema fixture coverage
+- [ ] Complete architecture, safety, and PoC lifecycle documentation
+- [ ] Additional domain-specific examples
 
 ### v0.2 — Replay and Comparison
 
-- [ ] Historical-log replay
+- [ ] Historical-log replay adapters
 - [ ] Candidate mutation
-- [ ] Behavioral-distance metrics
+- [ ] Expanded behavioral-distance metrics
 - [ ] Protocol comparison
 - [ ] Divergence reports
-- [ ] Prompt and model version comparison
+- [ ] Prompt, rule, and model version comparison
+- [ ] Repeated-run evidence aggregation
 
-### v0.3 — Adapters and Shadow Mode
+### v0.3 — Controlled Adapters
 
-- [ ] GitHub Issues adapter
-- [ ] Generic local-input adapter
-- [ ] Meeting-log adapter
-- [ ] Support-log adapter
-- [ ] Shadow-mode execution interface
-- [ ] Human-review console
+- [ ] Generic local-file Adapter
+- [ ] Human-review queue
+- [ ] Meeting-log Adapter
+- [ ] Support-log Adapter
+- [ ] Reversible live-action contract
+- [ ] Rollback and containment interfaces
+- [ ] Operator approval console
 
 ### Later Exploration
 
@@ -491,13 +761,14 @@ Future source adapters should emit the common Observation schema so downstream s
 - domain-specific graders;
 - protocol registries;
 - ProtocolMemory feedback loops;
-- controlled Action Adapter integration.
+- controlled Action Adapter integration;
+- monitored Level 4 and Level 5 operation.
 
 ---
 
 ## Contributing
 
-This repository is at an early experimental stage.
+This repository is experimental and safety-oriented.
 
 Useful contributions include:
 
@@ -510,6 +781,7 @@ Useful contributions include:
 - behavioral-distance metrics;
 - small reproducible domain examples;
 - safety and promotion-gate tests;
+- Shadow boundary tests;
 - documentation that clearly separates implemented behavior from planned behavior.
 
 Keep examples inspectable. Do not commit sensitive, confidential, or personally identifiable data.
@@ -526,4 +798,4 @@ Do not assume permissions beyond the contents of that file.
 
 ## One-Sentence Summary
 
-**LoPAS Protocol Foundry turns fragmented observations into traceable protocol candidates, tests declared behavior against simulated actuals, and promotes only qualified candidates toward limited, reversible real-world PoCs.**
+**LoPAS Protocol Foundry turns fragmented observations into traceable Protocol Candidates, tests and selects them through deterministic safety gates, and compiles only qualified candidates into no-side-effect Shadow Plans and Action Receipts.**
