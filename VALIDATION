@@ -1,0 +1,27 @@
+# Validation Record
+
+Validated on 2026-08-03 against the current public stage signatures and the
+current `protocol_candidate` / `poc_promotion` schemas.
+
+## Passed
+
+- Python bytecode compilation for all added source and test files;
+- 7 deterministic execution-gate tests;
+- 2 Promotion-to-Shadow pipeline tests using the repository sample candidate
+  and current schemas;
+- 2 integrated Foundry orchestration tests;
+- installer test against a repository-shaped checkout;
+- immediate Level 3 fixture:
+  - route: `READY`;
+  - Action Receipt status: `shadowed`;
+  - external effects: `[]`.
+
+Total: 11 tests passed.
+
+## Boundary
+
+The patch does not invoke adapters or perform external actions. It compiles and
+records what would execute after deterministic gates. A real repository checkout
+was not available in the execution container, so the upstream repository's
+entire pre-existing test suite was not run here; compatibility was checked
+against the current public schemas and callable stage interfaces.
