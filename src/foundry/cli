@@ -1,0 +1,110 @@
+"""Command-line interface for the integrated Foundry runtime."""
+
+from __future__ import annotations
+
+import argparse
+from datetime import datetime
+from pathlib import Path
+import sys
+
+from .errors import FoundryRunError
+from .pipeline import run_full_foundry
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    return datetime.fromisoformat(normalized)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m src.foundry",
+        description=(
+            "Run ingest, proxy, protocol, simulation, selection, and routing "
+            "as one receipt-preserving pipeline; optionally continue through "
+            "the no-side-effect shadow boundary."
+        ),
+    )
+    parser.add_argument("input", type=Path, help="Raw Observation input file.")
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=Path,
+        default=Path("receipts/full_run"),
+        help="Directory for all stage artifacts and the run manifest.",
+    )
+    parser.add_argument("--evidence", type=Path, default=None)
+    parser.add_argument("--allow-invalid", action="store_true")
+    parser.add_argument("--scenario-count", type=int, default=None)
+    parser.add_argument("--run-id", default=None)
+    parser.add_argument("--selection-id", default=None)
+    parser.add_argument("--recorded-at", default=None)
+    parser.add_argument("--current-level", type=int, default=1)
+    parser.add_argument("--next-level", type=int, default=2)
+    parser.add_argument("--recorded-by", default="lopas-protocol-foundry")
+    parser.add_argument(
+        "--shadow-bindings",
+        type=Path,
+        default=None,
+        help="Adapter binding manifest; enables the optional shadow stage.",
+    )
+    parser.add_argument(
+        "--execution-inputs",
+        type=Path,
+        default=None,
+        help="Candidate-scoped values used by the shadow gate.",
+    )
+    parser.add_argument(
+        "--require-shadow-ready",
+        action="store_true",
+        help="Fail the run unless at least one candidate reaches READY.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        result = run_full_foundry(
+            args.input,
+            args.output_dir,
+            evidence_path=args.evidence,
+            allow_invalid=args.allow_invalid,
+            scenario_count=args.scenario_count,
+            run_id=args.run_id,
+            selection_id=args.selection_id,
+            recorded_at=_parse_datetime(args.recorded_at),
+            current_level=args.current_level,
+            requested_next_level=args.next_level,
+            recorded_by=args.recorded_by,
+            shadow_bindings_path=args.shadow_bindings,
+            execution_inputs_path=args.execution_inputs,
+            require_shadow_ready=args.require_shadow_ready,
+        )
+    except (FoundryRunError, ValueError) as exc:
+        print(f"foundry error: {exc}", file=sys.stderr)
+        return 1
+
+    summary = result.manifest["summary"]
+    print(
+        "foundry:"
+        f" stages={len(result.manifest['completed_stages'])}"
+        f" candidates={summary['protocol_candidates']}"
+        f" simulations={summary['simulation_receipts']}"
+        f" promotion_routes={summary['promotion_routes']}"
+    )
+    if "execution_routes" in summary:
+        print(
+            "shadow:"
+            f" routes={summary['execution_routes']}"
+            f" statuses={summary['execution_statuses']}"
+            " external_effects=0"
+        )
+    print(f"manifest: {result.paths.manifest}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
