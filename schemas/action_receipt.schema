@@ -1,0 +1,102 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:lopas:protocol-foundry:action-receipt:0.1.0
+title: LoPAS Shadow Action Receipt
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - id
+  - recorded_at
+  - mode
+  - protocol_candidate_ref
+  - execution_plan_ref
+  - status
+  - decision
+  - steps
+  - external_effects
+  - artifacts
+  - provenance
+properties:
+  schema_version:
+    const: 0.1.0
+  id:
+    type: string
+    pattern: '^actionrcpt-[A-Za-z0-9][A-Za-z0-9._-]*$'
+  recorded_at:
+    type: string
+    format: date-time
+  mode:
+    const: shadow
+  protocol_candidate_ref:
+    type: string
+    pattern: '^protocol-[A-Za-z0-9][A-Za-z0-9._-]*$'
+  poc_promotion_ref:
+    type: [string, 'null']
+    pattern: '^poc-[A-Za-z0-9][A-Za-z0-9._-]*$'
+  execution_plan_ref:
+    type: string
+    pattern: '^execplan-[A-Za-z0-9][A-Za-z0-9._-]*$'
+  status:
+    type: string
+    enum: [shadowed, blocked, denied]
+  decision:
+    type: object
+    additionalProperties: false
+    required: [route, reasons]
+    properties:
+      route:
+        type: string
+        enum: [READY, HOLD, DENY]
+      reasons:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+  steps:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - step_ref
+        - action
+        - adapter
+        - status
+        - external_effect
+      properties:
+        step_ref:
+          type: string
+          minLength: 1
+        action:
+          type: string
+          minLength: 1
+        adapter:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [would_execute, not_run]
+        external_effect:
+          const: none
+  external_effects:
+    type: array
+    maxItems: 0
+  artifacts:
+    type: array
+  provenance:
+    type: object
+    additionalProperties: false
+    required:
+      - pipeline_version
+      - compiler_version
+      - binding_manifest_version
+    properties:
+      pipeline_version:
+        type: string
+        minLength: 1
+      compiler_version:
+        type: string
+        minLength: 1
+      binding_manifest_version:
+        type: string
+        minLength: 1
