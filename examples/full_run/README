@@ -1,0 +1,62 @@
+# Full Local Runtime
+
+Run every implemented Foundry stage and continue through the safe shadow
+boundary in one process:
+
+```bash
+python -m src.foundry \
+  examples/idea_observations/input.jsonl \
+  --output-dir receipts/full_run \
+  --scenario-count 30 \
+  --current-level 2 \
+  --next-level 3 \
+  --shadow-bindings examples/full_run/adapter_bindings.yaml \
+  --execution-inputs examples/full_run/execution_inputs.yaml
+```
+
+The execution boundary can also be rerun independently:
+
+```bash
+python -m src.execution \
+  receipts/full_run/03_protocol_candidates.yaml \
+  receipts/full_run/06_poc_promotions.yaml \
+  examples/full_run/adapter_bindings.yaml \
+  --inputs examples/full_run/execution_inputs.yaml \
+  --output-dir receipts/full_run
+```
+
+A generated candidate begins as `intent.status: unconfirmed`, so the expected
+first Action Receipt is normally `blocked`, not `shadowed`. That is correct: the
+runtime has completed the path and proved that an unconfirmed or insufficiently
+promoted candidate cannot cross the execution boundary.
+
+A `shadowed` result requires all of the following:
+
+- candidate intent is explicitly `confirmed`;
+- promotion decision is `PROMOTE`;
+- promotion eligibility and every declared check are true;
+- requested next level is at least Level 3;
+- blocking conditions are met or waived;
+- no approval is pending or rejected;
+- required inputs are present;
+- every action has an enabled binding.
+
+Shadow mode never invokes adapters and always records `external_effects: []`.
+
+## Immediate READY fixture
+
+The included synthetic fixture proves the final boundary independently of the
+upstream generation stages:
+
+```bash
+python -m src.execution \
+  examples/full_run/shadow_ready_candidates.yaml \
+  examples/full_run/shadow_ready_promotions.yaml \
+  examples/full_run/adapter_bindings.yaml \
+  --inputs examples/full_run/execution_inputs.yaml \
+  --output-dir receipts/shadow_ready \
+  --require-ready
+```
+
+Expected result: one `shadowed` Action Receipt, `READY`, and zero external
+effects. The fixture is synthetic validation material, not production evidence.
