@@ -1,0 +1,8 @@
+"""Integrated local Foundry runtime.
+
+Use ``python -m src.foundry`` or import from ``src.foundry.pipeline``. The
+package initializer stays lightweight so importing the namespace has no stage
+side effects.
+"""
+
+__all__: list[str] = []
