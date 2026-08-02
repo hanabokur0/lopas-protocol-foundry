@@ -1,0 +1,340 @@
+"""Integrated Observation-to-Shadow pipeline.
+
+This module composes the existing stage-local pipelines instead of
+reimplementing their rules. Every stage emits its ordinary artifact and
+receipt, while this runner adds one top-level run manifest. Shadow execution is
+optional and remains a zero-side-effect boundary.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from src.ingest.pipeline import ingest_file, write_yaml
+from src.protocol.pipeline import build_protocol_candidates
+from src.proxy.pipeline import build_proxies
+from src.routing.pipeline import run_routing
+from src.selection.pipeline import run_selection
+from src.simulation.pipeline import run_simulation
+
+from .errors import FoundryStageError
+
+
+FOUNDRY_PIPELINE_VERSION = "foundry-pipeline-0.1.0"
+
+
+@dataclass(frozen=True)
+class FoundryRunPaths:
+    """Canonical paths emitted by one integrated run."""
+
+    root: Path
+    manifest: Path
+    observations: Path
+    ingest_receipt: Path
+    proxies: Path
+    proxy_receipt: Path
+    candidates: Path
+    protocol_receipt: Path
+    simulation_receipts: Path
+    simulation_stage_receipt: Path
+    selection_results: Path
+    selection_stage_receipt: Path
+    promotions: Path
+    routing_stage_receipt: Path
+    execution_plans: Path
+    action_receipts: Path
+    execution_stage_receipt: Path
+
+    @classmethod
+    def under(cls, output_dir: str | Path) -> "FoundryRunPaths":
+        root = Path(output_dir).resolve()
+        return cls(
+            root=root,
+            manifest=root / "00_run_manifest.yaml",
+            observations=root / "01_observations.yaml",
+            ingest_receipt=root / "01_ingest_receipt.yaml",
+            proxies=root / "02_proxies.yaml",
+            proxy_receipt=root / "02_proxy_receipt.yaml",
+            candidates=root / "03_protocol_candidates.yaml",
+            protocol_receipt=root / "03_protocol_receipt.yaml",
+            simulation_receipts=root / "04_simulation_receipts.yaml",
+            simulation_stage_receipt=root / "04_simulation_stage_receipt.yaml",
+            selection_results=root / "05_selection_results.yaml",
+            selection_stage_receipt=root / "05_selection_stage_receipt.yaml",
+            promotions=root / "06_poc_promotions.yaml",
+            routing_stage_receipt=root / "06_routing_stage_receipt.yaml",
+            execution_plans=root / "07_execution_plans.yaml",
+            action_receipts=root / "07_action_receipts.yaml",
+            execution_stage_receipt=root / "07_execution_stage_receipt.yaml",
+        )
+
+    def core_artifact_map(self) -> dict[str, str]:
+        return {
+            "observations": str(self.observations),
+            "ingest_receipt": str(self.ingest_receipt),
+            "proxies": str(self.proxies),
+            "proxy_receipt": str(self.proxy_receipt),
+            "protocol_candidates": str(self.candidates),
+            "protocol_receipt": str(self.protocol_receipt),
+            "simulation_receipts": str(self.simulation_receipts),
+            "simulation_stage_receipt": str(self.simulation_stage_receipt),
+            "selection_results": str(self.selection_results),
+            "selection_stage_receipt": str(self.selection_stage_receipt),
+            "poc_promotions": str(self.promotions),
+            "routing_stage_receipt": str(self.routing_stage_receipt),
+        }
+
+    def execution_artifact_map(self) -> dict[str, str]:
+        return {
+            "execution_plans": str(self.execution_plans),
+            "action_receipts": str(self.action_receipts),
+            "execution_stage_receipt": str(self.execution_stage_receipt),
+        }
+
+
+@dataclass(frozen=True)
+class FullRunResult:
+    """Result returned by the integrated Foundry runner."""
+
+    paths: FoundryRunPaths
+    manifest: dict[str, Any]
+    promotions: list[dict[str, Any]]
+    action_receipts: list[dict[str, Any]]
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(microsecond=0)
+
+
+def _iso(moment: datetime) -> str:
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _manifest_base(
+    *,
+    input_path: Path,
+    paths: FoundryRunPaths,
+    started_at: datetime,
+    run_id: str | None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "0.1.0",
+        "receipt_type": "foundry_run",
+        "pipeline_version": FOUNDRY_PIPELINE_VERSION,
+        "started_at": _iso(started_at),
+        "ended_at": None,
+        "status": "running",
+        "input": {"path": str(input_path)},
+        "run_id": run_id,
+        "completed_stages": [],
+        "failed_stage": None,
+        "error": None,
+        "artifacts": paths.core_artifact_map(),
+        "summary": {},
+    }
+
+
+def _count_values(documents: list[dict[str, Any]], path: tuple[str, ...]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for document in documents:
+        value: Any = document
+        for key in path:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(key)
+        label = str(value)
+        counts[label] = counts.get(label, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def run_full_foundry(
+    input_path: str | Path,
+    output_dir: str | Path,
+    *,
+    evidence_path: str | Path | None = None,
+    allow_invalid: bool = False,
+    scenario_count: int | None = None,
+    run_id: str | None = None,
+    selection_id: str | None = None,
+    recorded_at: datetime | None = None,
+    current_level: int = 1,
+    requested_next_level: int = 2,
+    recorded_by: str = "lopas-protocol-foundry",
+    shadow_bindings_path: str | Path | None = None,
+    execution_inputs_path: str | Path | None = None,
+    require_shadow_ready: bool = False,
+) -> FullRunResult:
+    """Run every implemented Foundry stage and optionally reach shadow output.
+
+    A valid HOLD/REVISE/REJECT/DENY promotion—or a blocked shadow plan—is a
+    successful pipeline result. The runner fails only when a stage cannot
+    produce its declared artifact, unless ``require_shadow_ready`` is set.
+    """
+
+    source = Path(input_path).resolve()
+    paths = FoundryRunPaths.under(output_dir)
+    paths.root.mkdir(parents=True, exist_ok=True)
+
+    started_at = recorded_at or _utc_now()
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    manifest = _manifest_base(
+        input_path=source,
+        paths=paths,
+        started_at=started_at,
+        run_id=run_id,
+    )
+    write_yaml(paths.manifest, manifest)
+
+    active_stage = "ingest"
+    action_receipts: list[dict[str, Any]] = []
+    try:
+        ingest_result = ingest_file(source)
+        write_yaml(paths.ingest_receipt, ingest_result.receipt())
+        if not ingest_result.is_valid and not allow_invalid:
+            raise FoundryStageError(
+                "ingest",
+                f"{len(ingest_result.invalid_records)} record(s) failed validation",
+            )
+        if not ingest_result.valid_records:
+            raise FoundryStageError("ingest", "no valid observations remain")
+        write_yaml(paths.observations, ingest_result.valid_records)
+        manifest["completed_stages"].append("ingest")
+
+        active_stage = "proxy"
+        proxy_result = build_proxies(paths.observations)
+        write_yaml(paths.proxies, proxy_result.proxies)
+        write_yaml(paths.proxy_receipt, proxy_result.receipt())
+        manifest["completed_stages"].append("proxy")
+
+        active_stage = "protocol"
+        protocol_result = build_protocol_candidates(paths.proxies)
+        write_yaml(paths.candidates, protocol_result.candidates)
+        write_yaml(paths.protocol_receipt, protocol_result.receipt())
+        manifest["completed_stages"].append("protocol")
+
+        active_stage = "simulation"
+        simulation_result = run_simulation(
+            paths.candidates,
+            scenario_count=scenario_count,
+            run_id=run_id,
+            recorded_at=started_at,
+        )
+        write_yaml(paths.simulation_receipts, simulation_result.receipts)
+        write_yaml(paths.simulation_stage_receipt, simulation_result.stage_receipt())
+        manifest["run_id"] = simulation_result.run_id
+        manifest["completed_stages"].append("simulation")
+
+        active_stage = "selection"
+        selection_result = run_selection(
+            paths.simulation_receipts,
+            selection_id=selection_id,
+            recorded_at=started_at,
+        )
+        write_yaml(paths.selection_results, selection_result.document)
+        write_yaml(paths.selection_stage_receipt, selection_result.stage_receipt())
+        manifest["completed_stages"].append("selection")
+
+        active_stage = "routing"
+        routing_result = run_routing(
+            paths.candidates,
+            paths.selection_results,
+            evidence_path=evidence_path,
+            current_level=current_level,
+            requested_next_level=requested_next_level,
+            decided_at=started_at,
+            recorded_by=recorded_by,
+        )
+        write_yaml(paths.promotions, routing_result.promotions)
+        write_yaml(paths.routing_stage_receipt, routing_result.stage_receipt())
+        manifest["completed_stages"].append("routing")
+
+        summary: dict[str, Any] = {
+            "observations": len(ingest_result.valid_records),
+            "proxies": len(proxy_result.proxies),
+            "protocol_candidates": len(protocol_result.candidates),
+            "simulation_receipts": len(simulation_result.receipts),
+            "selection_results": len(selection_result.document["results"]),
+            "promotion_decisions": len(routing_result.promotions),
+            "promotion_routes": _count_values(
+                routing_result.promotions, ("decision", "route")
+            ),
+        }
+
+        if shadow_bindings_path is not None:
+            active_stage = "execution"
+            # Local import keeps Foundry usable without activating execution
+            # code unless the caller explicitly asks for the shadow boundary.
+            from src.execution.pipeline import (
+                run_shadow_execution,
+                write_execution_outputs,
+            )
+
+            execution_result = run_shadow_execution(
+                paths.candidates,
+                paths.promotions,
+                shadow_bindings_path,
+                inputs_path=execution_inputs_path,
+            )
+            written = write_execution_outputs(execution_result, paths.root)
+            if written["plans"] != paths.execution_plans:
+                raise FoundryStageError("execution", "unexpected execution plan path")
+            action_receipts = execution_result.receipts
+            manifest["artifacts"].update(paths.execution_artifact_map())
+            manifest["completed_stages"].append("execution")
+            summary["execution_receipts"] = len(action_receipts)
+            summary["execution_routes"] = _count_values(
+                action_receipts, ("decision", "route")
+            )
+            summary["execution_statuses"] = _count_values(
+                action_receipts, ("status",)
+            )
+            if require_shadow_ready and not any(
+                receipt["decision"]["route"] == "READY"
+                for receipt in action_receipts
+            ):
+                raise FoundryStageError(
+                    "execution", "no candidate reached the READY shadow gate"
+                )
+        elif execution_inputs_path is not None or require_shadow_ready:
+            raise FoundryStageError(
+                "execution",
+                "execution inputs/readiness require --shadow-bindings",
+            )
+
+        manifest["status"] = "success"
+        manifest["ended_at"] = _iso(_utc_now())
+        manifest["summary"] = summary
+        write_yaml(paths.manifest, manifest)
+        return FullRunResult(
+            paths=paths,
+            manifest=manifest,
+            promotions=routing_result.promotions,
+            action_receipts=action_receipts,
+        )
+    except FoundryStageError as exc:
+        manifest["status"] = "failed"
+        manifest["failed_stage"] = exc.stage
+        manifest["error"] = {
+            "type": type(exc).__name__,
+            "message": exc.message,
+        }
+        manifest["ended_at"] = _iso(_utc_now())
+        write_yaml(paths.manifest, manifest)
+        raise
+    except Exception as exc:  # stage-local exceptions remain visible in receipt
+        manifest["status"] = "failed"
+        manifest["failed_stage"] = active_stage
+        manifest["error"] = {
+            "type": type(exc).__name__,
+            "message": str(exc),
+        }
+        manifest["ended_at"] = _iso(_utc_now())
+        write_yaml(paths.manifest, manifest)
+        raise FoundryStageError(active_stage, str(exc)) from exc
