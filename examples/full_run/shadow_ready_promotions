@@ -1,0 +1,47 @@
+- schema_version: 0.1.0
+  id: poc-customer-support-llm-001
+  protocol_candidate_ref: protocol-customer-support-llm-001
+  decided_at: '2026-08-03T01:00:00Z'
+  current_level: 2
+  requested_next_level: 3
+  simulation_receipt_refs:
+  - simrcpt-test-001
+  evidence_refs:
+  - evidence-test-001
+  eligibility:
+    eligible: true
+    checks:
+      provenance_complete: true
+      schema_valid: true
+      simulation_coverage_sufficient: true
+      authority_defined: true
+      monitoring_defined: true
+      rollback_defined: true
+      human_review_satisfied: true
+    reasons: []
+  risk_assessment:
+    external_impact: medium
+    reversibility: high
+    data_sensitivity: medium
+    silent_failure_risk: medium
+    overall: medium
+    mitigations:
+    - shadow mode only
+  decision:
+    route: PROMOTE
+    reason: Synthetic Level 3 compatibility test.
+    archive: elite
+    expires_at: null
+  conditions: []
+  approvals:
+  - role: protocol_owner
+    approver_ref: human-test-001
+    status: approved
+    decided_at: '2026-08-03T01:00:00Z'
+    note: Synthetic test approval.
+  provenance:
+    decision_engine: generated_test_fixture
+    decision_engine_version: test-0.1.0
+    recorded_by: runtime-compatibility-test
+    rule_refs:
+    - shadow-level-3
