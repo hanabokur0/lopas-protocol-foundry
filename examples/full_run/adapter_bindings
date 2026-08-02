@@ -1,0 +1,12 @@
+schema_version: 0.1.0
+manifest_version: sample-support-bindings-0.1.0
+bindings:
+  assess_request_completeness:
+    adapter: rule.support_request_completeness.v1
+    enabled: true
+  generate_support_draft:
+    adapter: llm.support_draft.v1
+    enabled: true
+  request_human_review:
+    adapter: human.review_queue.v1
+    enabled: true
