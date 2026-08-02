@@ -1,0 +1,8 @@
+"""Controlled execution boundary for promoted Protocol Candidates.
+
+The public runtime objects are intentionally not imported eagerly. This keeps
+schema/compiler utilities usable in isolation and avoids pulling the entire
+Foundry pipeline into simple gate tests.
+"""
+
+__all__: list[str] = []
