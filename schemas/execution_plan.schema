@@ -1,0 +1,122 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:lopas:protocol-foundry:execution-plan:0.1.0
+title: LoPAS Shadow Execution Plan
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - id
+  - compiled_at
+  - mode
+  - protocol_candidate_ref
+  - compiler_version
+  - gate
+  - required_inputs
+  - provided_input_refs
+  - steps
+  - external_effects_permitted
+properties:
+  schema_version:
+    const: 0.1.0
+  id:
+    type: string
+    pattern: '^execplan-[A-Za-z0-9][A-Za-z0-9._-]*$'
+  compiled_at:
+    type: string
+    format: date-time
+  mode:
+    const: shadow
+  protocol_candidate_ref:
+    type: string
+    pattern: '^protocol-[A-Za-z0-9][A-Za-z0-9._-]*$'
+  poc_promotion_ref:
+    type: [string, 'null']
+    pattern: '^poc-[A-Za-z0-9][A-Za-z0-9._-]*$'
+  compiler_version:
+    type: string
+    minLength: 1
+  gate:
+    $ref: '#/$defs/gate'
+  required_inputs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  provided_input_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  steps:
+    type: array
+    items:
+      $ref: '#/$defs/step'
+  external_effects_permitted:
+    const: false
+$defs:
+  gate:
+    type: object
+    additionalProperties: false
+    required: [route, reasons]
+    properties:
+      route:
+        type: string
+        enum: [READY, HOLD, DENY]
+      reasons:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+  step:
+    type: object
+    additionalProperties: false
+    required:
+      - sequence
+      - step_ref
+      - action
+      - declared_executor
+      - adapter
+      - binding_enabled
+      - input_refs
+      - output_refs
+      - requires_human_confirmation
+      - on_failure
+      - mode
+      - external_effect
+    properties:
+      sequence:
+        type: integer
+        minimum: 1
+      step_ref:
+        type: string
+        minLength: 1
+      action:
+        type: string
+        minLength: 1
+      declared_executor:
+        type: string
+        minLength: 1
+      adapter:
+        type: [string, 'null']
+      binding_enabled:
+        type: boolean
+      input_refs:
+        type: array
+        items:
+          type: string
+      output_refs:
+        type: array
+        items:
+          type: string
+      requires_human_confirmation:
+        type: boolean
+      on_failure:
+        type: string
+        minLength: 1
+      mode:
+        const: shadow
+      external_effect:
+        const: none
