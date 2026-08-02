@@ -1,0 +1,43 @@
+# LoPAS Integrated Runtime Patch
+
+This patch connects the existing stage-local implementations without replacing
+their rules.
+
+## Added
+
+- `src/foundry/`: Ingest → Proxy → Protocol → Simulation → Selection → Routing
+  orchestration with one run manifest;
+- `src/execution/`: promotion-aware, no-side-effect Shadow compiler and gate;
+- execution plan, action receipt, and adapter manifest schemas;
+- one-command optional continuation from Foundry to Action Receipt;
+- deterministic tests for orchestration and execution gating;
+- local runtime documentation and example binding/input files;
+- a schema-valid synthetic Level 3 fixture that must reach `READY` without side effects.
+
+## Install
+
+From this patch directory:
+
+```bash
+python apply_patch.py /path/to/lopas-protocol-foundry
+```
+
+The installer refuses to overwrite changed files unless `--force` is supplied
+and creates `pyproject.toml.runtime-patch.bak` before changing the package list.
+Use `--dry-run` to inspect the operation.
+
+## Test
+
+From the repository root after installation:
+
+```bash
+python -m compileall -q src tests
+python -m unittest \
+  tests.test_execution_gate \
+  tests.test_execution_pipeline \
+  tests.test_foundry_pipeline -v
+```
+
+The patch deliberately does not add a live adapter executor. `READY` means that
+a plan may be observed in shadow mode; it does not authorize an external side
+effect.
