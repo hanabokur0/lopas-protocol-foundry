@@ -1,0 +1,35 @@
+## Integrated Local Runtime
+
+The stage-local implementations can now be composed as one receipt-preserving
+run. An optional final stage compiles promotion decisions into no-side-effect
+Shadow Execution Plans and Action Receipts.
+
+```text
+Observation
+→ Ingest
+→ Proxy
+→ Protocol Candidate
+→ Simulation
+→ Selection
+→ PoC Promotion
+→ Shadow Execution Plan
+→ Action Receipt
+```
+
+```bash
+python -m src.foundry \
+  examples/idea_observations/input.jsonl \
+  --output-dir receipts/full_run \
+  --scenario-count 30 \
+  --current-level 2 \
+  --next-level 3 \
+  --shadow-bindings examples/full_run/adapter_bindings.yaml \
+  --execution-inputs examples/full_run/execution_inputs.yaml
+```
+
+A blocked result is a valid result. Generated candidates begin unconfirmed, and
+unknown evidence, insufficient promotion, missing inputs, pending approvals,
+or missing adapter bindings remain outside the execution boundary. Shadow mode
+never invokes an adapter and records `external_effects: []`.
+
+See `docs/local-runtime.md` for the complete contract and artifact list.
