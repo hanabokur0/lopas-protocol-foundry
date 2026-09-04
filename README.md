@@ -1,6 +1,8 @@
 # LoPAS Protocol Foundry
 
-LoPAS Protocol Foundry is an **experimental local runtime for turning fragmented observations into traceable Protocol Candidates, testing them against explicit scenarios, selecting and routing them through conservative promotion gates, and compiling qualified candidates into no-side-effect Shadow Execution Plans and Action Receipts.**
+LoPAS Protocol Foundry is an **experimental protocol discovery, evaluation, promotion, and Shadow-compilation system** for turning fragmented observations into traceable workflow candidates.
+
+It explores the layer **before automation**:
 
 ```text
 Observation
@@ -17,85 +19,260 @@ Observation
 
 Raw observations are materials, not instructions.
 
-The Foundry does not treat a post, complaint, meeting note, idea, or workaround as an executable workflow. It first converts source material into an inspectable candidate with explicit inputs, conditions, routes, safety boundaries, provenance, activation requirements, and failure behavior.
+A complaint, meeting note, workaround, idea, failure report, or repeated friction point is not treated as an executable workflow. The Foundry first translates source material into explicit, inspectable contracts with provenance, conditions, routes, failure behavior, authority boundaries, and promotion requirements.
 
-> **Project status: v0.1 local Foundry runtime.**  
-> The repository contains executable stage-local pipelines, an integrated local runner, deterministic Selection and Routing, and a conservative Promotion-to-Shadow boundary. It is **not** a production service, autonomous executor, or live external-action runtime.
+> **Project status: experimental local runtime.**
+>
+> The repository currently contains a Python reference runtime and a C++20 reference port.
+>
+> The Python runtime implements the broader v0.1 Foundry pipeline through the no-side-effect Shadow boundary.
+>
+> The C++20 runtime currently focuses on typed deterministic evaluation, conservative gating, promotion, and Shadow receipt generation. It is not yet a full behavioral replacement for the Python runtime.
+
+---
+
+## Core Idea
+
+Most automation systems begin after a workflow has already been defined:
+
+```text
+Human-defined workflow
+→ AI / RPA / software
+→ execution
+```
+
+LoPAS Protocol Foundry explores the translation layer before that:
+
+```text
+Fragmented observations
+→ reusable structure
+→ explicit protocol candidate
+→ scenario-based evaluation
+→ evidence-aware gate
+→ controlled runtime
+```
+
+The important artifact is not the implementation language.
+
+The important artifact is the **protocol contract and its invariants**.
+
+```text
+                 ┌→ Python runtime
+Observation      │
+→ Protocol ──────┼→ C++20 runtime
+                 │
+                 ├→ RPA / Adapter
+                 │
+                 └→ future Agent runtime
+```
+
+Different runtimes may implement the same protocol boundary, provided that critical behavior is preserved and verified.
+
+This makes the Foundry a translation layer between:
+
+```text
+human observations
+        ↓
+structured evidence
+        ↓
+protocol
+        ↓
+deterministic gate
+        ↓
+runtime
+        ↓
+receipt
+```
 
 ---
 
 ## Why This Exists
 
-Most AI automation begins after a workflow has already been defined:
+The goal is not to ask an LLM for one “best workflow.”
 
-```text
-Human-defined workflow
-→ AI agent
-→ execution
-```
-
-LoPAS Protocol Foundry explores the layer before that:
-
-```text
-Distributed observations
-→ reusable structure
-→ candidate workflows
-→ scenario-based evaluation
-→ evidence-aware promotion
-→ limited and reversible PoC
-```
-
-The goal is not to ask an LLM for one “best idea.” The goal is to provide a pipeline that can:
+The goal is to build an inspectable pipeline that can:
 
 - preserve source evidence separately from interpretation;
 - normalize repeated friction into reusable Proxies;
-- generate explicit Protocol Candidates rather than hidden instructions;
+- turn vague observations into explicit Protocol Candidates;
+- keep required inputs, conditions, routes, and authority visible;
 - test candidates under nominal, boundary, adversarial, and failure conditions;
 - compare expected behavior with simulated actual behavior;
 - preserve strong, unusual, anomalous, and rejected candidates;
-- promote only qualified candidates toward controlled real-world testing;
 - stop safely when evidence, authority, approval, or bindings are incomplete;
-- record meaningful transformations and decisions as receipts.
+- promote only qualified candidates toward controlled testing;
+- record meaningful transformations and decisions as receipts;
+- allow multiple runtime implementations without silently changing protocol meaning.
 
-Simulation is not proof of real-world effectiveness. A generated protocol remains a candidate until it passes explicit promotion gates.
+Simulation is not proof of real-world effectiveness.
 
----
-
-## Current Scope
-
-### Implemented and inspectable
-
-- versioned YAML schemas for the major stage boundaries;
-- deterministic local Ingest, Proxy, Protocol, Simulation, Selection, and Routing stages;
-- synthetic scenario generation and independent grading inside the Simulation stage;
-- stage-local command-line interfaces;
-- one-process orchestration through `python -m src.foundry`;
-- Selection archives for `elite`, `rare`, `anomaly`, and `reject`;
-- evidence-aware PoC promotion decisions;
-- an optional Promotion-to-Shadow execution boundary;
-- Adapter Binding validation without invoking adapters;
-- Shadow Execution Plans and Action Receipts with zero external effects;
-- a manually inspectable sample trace;
-- a synthetic Level 3 READY fixture;
-- regression tests for the integrated runner and execution gate.
-
-### Not implemented as production capability
-
-- live Adapter invocation;
-- autonomous external execution;
-- production source integrations;
-- a human-review console;
-- a hosted API or stable SDK;
-- complete historical replay infrastructure across real operational logs;
-- production-grade secrets, identity, authorization, and tenancy;
-- ProtocolMemory feedback automation;
-- guarantees that simulation predicts real-world performance.
-
-Interfaces, filenames, schemas, and runtime behavior may still change during v0.1.
+A generated protocol remains a candidate until it passes explicit promotion gates.
 
 ---
 
-## Core Pipeline
+# Runtime Implementations
+
+## Python Reference Runtime
+
+The Python runtime is the broader reference implementation of the current Foundry pipeline.
+
+It currently includes:
+
+- YAML/JSON/JSONL observation ingestion;
+- schema validation;
+- Proxy generation;
+- Protocol Candidate generation;
+- synthetic Scenario generation;
+- deterministic Simulation;
+- Independent Grading;
+- Selection;
+- evidence-aware PoC Routing;
+- Promotion-to-Shadow gating;
+- Adapter Binding validation;
+- Shadow Execution Plans;
+- Action Receipts;
+- integrated local execution;
+- regression tests.
+
+Run the full local Python pipeline with:
+
+```bash
+python -m src.foundry \
+  <observation-input.yaml> \
+  --output-dir receipts/full_run \
+  --scenario-count 30 \
+  --current-level 2 \
+  --next-level 3
+```
+
+---
+
+## C++20 Reference Port
+
+`cpp/` contains a buildable C++20 reference implementation of the deterministic Foundry core.
+
+The goal of the C++ port is **not** to claim that C++ is inherently better than Python.
+
+It exists to test whether the Foundry's important invariants can survive translation into a different runtime.
+
+The current C++20 implementation includes:
+
+- typed domain models;
+- `enum class` routes and verdicts;
+- `std::variant` condition values;
+- `std::optional` unknown/evidence states;
+- deterministic expression evaluation;
+- conservative route precedence;
+- Scenario simulation;
+- Independent Grading;
+- Selection;
+- evidence-aware Promotion;
+- Shadow Action Receipt generation;
+- JSON input/output;
+- CMake build;
+- native tests;
+- sanitizer support;
+- Linux CI support.
+
+The C++ runtime currently uses:
+
+```text
+C++20
+CMake 3.20+
+json-c
+```
+
+### Important compatibility note
+
+The C++20 runtime is currently a **reference port**, not a full replacement for the Python runtime.
+
+It does not yet claim complete parity for:
+
+- YAML handling;
+- every existing JSON/YAML schema;
+- all task-specific Proxy rules;
+- all Protocol templates;
+- every Scenario generator;
+- cross-candidate diversity behavior;
+- Python-vs-C++ golden-output parity.
+
+See:
+
+```text
+cpp/COMPATIBILITY.md
+cpp/VALIDATION.md
+```
+
+before treating the C++ runtime as behaviorally equivalent to the Python implementation.
+
+---
+
+# Safety Invariants
+
+Regardless of implementation language, the intended Foundry behavior is conservative.
+
+## Route precedence
+
+```text
+DENY > ESCALATE > HOLD > REVIEW > AUTO
+```
+
+A less restrictive route must never override a more restrictive applicable route.
+
+## Unknown means HOLD
+
+Unsupported or unresolved conditions do not silently become permission.
+
+```text
+known safe      → continue evaluation
+unknown         → HOLD
+unsupported     → HOLD
+explicit denial → DENY
+```
+
+## Candidates are not authority
+
+Generated Protocol Candidates begin unconfirmed.
+
+```yaml
+intent:
+  status: unconfirmed
+```
+
+Generation does not authorize execution.
+
+## Missing evidence blocks promotion
+
+Strong Simulation performance alone is insufficient.
+
+Required evidence may include:
+
+- source diversity;
+- authority scope;
+- monitoring;
+- rollback or containment;
+- human approval;
+- execution bindings.
+
+Missing required evidence keeps the candidate on `HOLD`.
+
+## Shadow means no external effect
+
+Even when a candidate reaches `READY`, Shadow mode does not execute the external action.
+
+Expected Shadow behavior:
+
+```text
+route: READY
+status: shadowed
+external_effects: []
+```
+
+The Shadow boundary exists to prove that a candidate **could be compiled into an execution plan**, not that an external action actually occurred.
+
+---
+
+# Core Pipeline
 
 ```mermaid
 flowchart LR
@@ -122,25 +299,104 @@ flowchart LR
     T --> U[ProtocolMemory]
 ```
 
-The executable local path currently reaches the Shadow boundary. Shadow mode describes and records what would execute, but does not call tools, LLMs, humans, APIs, or external systems.
+The current executable local path reaches the Shadow boundary.
+
+Shadow mode describes and records what would execute but does not call external tools, APIs, humans, adapters, or services.
 
 ---
 
-## Quick Start
+# Current Scope
+
+## Implemented and inspectable
+
+### Shared architecture
+
+- Observation → Proxy → Protocol Candidate pipeline;
+- deterministic safety-oriented routing;
+- Simulation and Independent Grading;
+- Selection archives;
+- evidence-aware promotion;
+- conservative execution boundaries;
+- receipts and provenance;
+- Shadow-mode zero-external-effect behavior.
+
+### Python runtime
+
+- versioned YAML schemas;
+- JSON/YAML/JSONL input;
+- stage-local CLIs;
+- integrated local runner;
+- synthetic Scenario generation;
+- Independent Grading;
+- Selection archives:
+  - `elite`
+  - `rare`
+  - `anomaly`
+  - `reject`
+- PoC Promotion;
+- Adapter Binding validation;
+- Shadow Execution Plans;
+- Action Receipts;
+- synthetic Level 3 READY fixture;
+- regression tests.
+
+### C++20 runtime
+
+- typed Foundry models;
+- deterministic condition evaluator;
+- route precedence;
+- Simulation;
+- Independent Grading;
+- Selection;
+- Promotion;
+- Shadow receipt generation;
+- JSON boundary;
+- CMake build;
+- native test executable;
+- optional ASan/UBSan;
+- CI-ready build structure.
+
+---
+
+## Not implemented as production capability
+
+This repository does **not** currently provide:
+
+- autonomous external execution;
+- production Adapter invocation;
+- production source integrations;
+- a hosted stable API;
+- a stable SDK;
+- production authentication or authorization;
+- production secrets management;
+- multi-tenant isolation;
+- a production human-review console;
+- complete real-world historical replay infrastructure;
+- automatic ProtocolMemory learning;
+- guarantees that Simulation predicts real-world outcomes;
+- guaranteed Python/C++ behavioral parity.
+
+Interfaces, filenames, schemas, thresholds, and runtime behavior may still change.
+
+---
+
+# Quick Start
+
+## Python
 
 ### Requirements
 
-- Python 3.11 or later
+- Python 3.11+
 - PyYAML
 - jsonschema with format support
 
-Install the project locally:
+Install:
 
 ```bash
 python -m pip install -e .
 ```
 
-Run the tests:
+Run tests:
 
 ```bash
 python -m unittest \
@@ -149,11 +405,136 @@ python -m unittest \
   tests.test_foundry_pipeline -v
 ```
 
+Run the integrated Foundry:
+
+```bash
+python -m src.foundry \
+  <observation-input.yaml> \
+  --output-dir receipts/full_run \
+  --scenario-count 30 \
+  --current-level 2 \
+  --next-level 3
+```
+
 ---
 
-## Integrated Local Runtime
+## C++20
 
-Run every implemented Foundry stage in one receipt-preserving process:
+### Requirements
+
+- CMake 3.20+
+- C++20 compiler
+- `json-c`
+
+GCC 12+ or Clang 15+ is recommended.
+
+Ubuntu / Debian:
+
+```bash
+sudo apt-get install -y \
+  build-essential \
+  cmake \
+  libjson-c-dev
+```
+
+### Build from repository root
+
+```bash
+cmake \
+  -S cpp \
+  -B cpp/build \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build cpp/build --parallel
+```
+
+Run tests:
+
+```bash
+ctest \
+  --test-dir cpp/build \
+  --output-on-failure
+```
+
+Optional sanitizer build:
+
+```bash
+cmake \
+  -S cpp \
+  -B cpp/build-sanitize \
+  -DLOPAS_ENABLE_SANITIZERS=ON
+
+cmake --build cpp/build-sanitize --parallel
+
+ctest \
+  --test-dir cpp/build-sanitize \
+  --output-on-failure
+```
+
+---
+
+# C++20 Examples
+
+## Conservative default
+
+Run without confirming candidate intent and without promotion evidence:
+
+```bash
+./cpp/build/lopas_foundry \
+  cpp/examples/observations.json \
+  --output-dir cpp/receipts/default \
+  --scenario-count 20
+```
+
+The expected behavior is conservative.
+
+Missing confirmation or required evidence should prevent unsafe promotion.
+
+---
+
+## Confirmed candidate with evidence
+
+```bash
+./cpp/build/lopas_foundry \
+  cpp/examples/observations.json \
+  --output-dir cpp/receipts/confirmed \
+  --scenario-count 20 \
+  --confirm-intent \
+  --evidence cpp/examples/evidence.json \
+  --current-level 2 \
+  --next-level 3
+```
+
+---
+
+## Optional Shadow boundary
+
+```bash
+./cpp/build/lopas_foundry \
+  cpp/examples/observations.json \
+  --output-dir cpp/receipts/shadow \
+  --scenario-count 20 \
+  --confirm-intent \
+  --evidence cpp/examples/evidence.json \
+  --current-level 2 \
+  --next-level 3 \
+  --shadow-bindings cpp/examples/adapter_bindings.json
+```
+
+A successful Shadow compilation must still report no real-world effects.
+
+```json
+{
+  "status": "shadowed",
+  "external_effects": []
+}
+```
+
+---
+
+# Python Integrated Local Runtime
+
+Run every implemented Python Foundry stage in one receipt-preserving process:
 
 ```bash
 python -m src.foundry \
@@ -177,17 +558,26 @@ python -m src.foundry \
   --execution-inputs examples/full_run/execution_inputs.yaml
 ```
 
-Without `--shadow-bindings`, the run stops after PoC Promotion.
+Without `--shadow-bindings`, the integrated run stops after PoC Promotion.
 
-A completed run may legitimately end with `HOLD`, `REVISE`, `REJECT`, or `DENY`. A Shadow Plan may likewise be `blocked` or `denied`. These are valid governance results, not runtime crashes.
+A completed run may legitimately end with:
 
-Use `--require-shadow-ready` only when a fixture or CI job is specifically expected to produce at least one `READY` result.
+```text
+HOLD
+REVISE
+REJECT
+DENY
+```
+
+A Shadow Plan may similarly be blocked or denied.
+
+These are valid governance results, not runtime crashes.
 
 ---
 
-## Shadow Execution Boundary
+# Shadow Execution Boundary
 
-The execution stage can be rerun independently against existing candidates and promotions:
+The Python execution stage can also be rerun independently against existing candidates and promotions:
 
 ```bash
 python -m src.execution \
@@ -198,35 +588,38 @@ python -m src.execution \
   --output-dir receipts/full_run
 ```
 
-The execution gate independently verifies:
+The execution gate independently verifies that:
 
 - the Promotion references the same Protocol Candidate;
-- candidate intent is explicitly `confirmed`;
+- candidate intent is explicitly confirmed;
 - the promotion decision is `PROMOTE`;
-- promotion eligibility and all declared checks are true;
+- promotion eligibility is true;
+- all declared checks are true;
 - the requested next level is at least Level 3;
-- blocking conditions are met or waived;
-- no approval is pending or rejected;
+- blocking conditions are resolved or waived;
+- no required approval is pending or rejected;
 - authority scope is known;
 - required execution inputs are present;
 - every action has an enabled Adapter Binding;
 - no step action is explicitly forbidden.
 
-Missing or unknown information becomes `HOLD`. Explicit rejection, denial, or rejected approval becomes `DENY`.
+Missing or unknown information becomes `HOLD`.
+
+Explicit rejection, denial, or rejected approval becomes `DENY`.
 
 Even when the gate returns `READY`, Shadow mode:
 
-- does not invoke the bound Adapter;
+- does not invoke the Adapter;
 - does not perform external actions;
-- records each step with `external_effect: none`;
+- records every step as having no external effect;
 - emits `external_effects: []`;
 - writes an Action Receipt with status `shadowed`.
 
 ---
 
-## Immediate READY Fixture
+# Immediate READY Fixture
 
-The included synthetic fixture verifies the Promotion-to-Shadow boundary independently of upstream generation:
+The Python runtime includes a synthetic fixture that verifies the Promotion-to-Shadow boundary independently of upstream generation:
 
 ```bash
 python -m src.execution \
@@ -246,50 +639,44 @@ status: shadowed
 external_effects: []
 ```
 
-This fixture is validation material, not production evidence.
+This fixture is validation material.
+
+It is not production evidence.
 
 ---
 
-## Generated Artifacts
+# Stage Responsibilities
 
-An integrated run writes:
+## 1. Observation and Ingest
+
+An Observation is a source-grounded record of something that:
+
+- happened;
+- failed;
+- repeated;
+- was proposed;
+- was avoided;
+- remained unresolved.
+
+The Python Ingest stage accepts:
 
 ```text
-00_run_manifest.yaml
-01_observations.yaml
-01_ingest_receipt.yaml
-02_proxies.yaml
-02_proxy_receipt.yaml
-03_protocol_candidates.yaml
-03_protocol_receipt.yaml
-04_simulation_receipts.yaml
-04_simulation_stage_receipt.yaml
-05_selection_results.yaml
-05_selection_stage_receipt.yaml
-06_poc_promotions.yaml
-06_routing_stage_receipt.yaml
-07_execution_plans.yaml          # with --shadow-bindings
-07_action_receipts.yaml          # with --shadow-bindings
-07_execution_stage_receipt.yaml  # with --shadow-bindings
+.jsonl
+.ndjson
+.json
+.yaml
+.yml
 ```
 
-The top-level manifest is updated after each completed stage. If a stage cannot produce its declared contract, the manifest records the failed stage and error.
+Each record is validated against:
 
----
+```text
+schemas/observation.schema.yaml
+```
 
-## Stage Responsibilities
+Invalid records are never silently mixed into validated output.
 
-### Observation and Ingest
-
-An Observation is a source-grounded record of something that happened, was proposed, failed, repeated, was avoided, or remained unresolved.
-
-The Ingest stage accepts structured documents in:
-
-- `.jsonl` / `.ndjson`;
-- `.json`;
-- `.yaml` / `.yml`.
-
-It validates each record against `schemas/observation.schema.yaml`. Invalid records are never silently mixed into validated output.
+Example:
 
 ```bash
 python -m src.ingest \
@@ -297,24 +684,32 @@ python -m src.ingest \
   --output receipts/observations.yaml
 ```
 
-An Observation is evidence-bearing input. It is not yet a recommendation or executable protocol.
+An Observation is evidence-bearing input.
 
-### Proxy
+It is not yet a recommendation or executable protocol.
+
+---
+
+## 2. Proxy
 
 A Proxy is a normalized intermediate representation that separates reusable structure from source wording.
 
-The deterministic v0.1 baseline records:
+The deterministic baseline records information such as:
 
 - task type;
 - friction;
 - affected actors;
 - expected effects;
-- evidence density and confidence;
+- evidence density;
+- confidence;
 - external impact;
 - reversibility;
 - uncertainty;
-- constraints and risk hints;
-- provenance references.
+- constraints;
+- risk hints;
+- provenance.
+
+Example:
 
 ```bash
 python -m src.proxy \
@@ -322,17 +717,25 @@ python -m src.proxy \
   --output receipts/proxies.yaml
 ```
 
-Every interpretation remains labeled as interpretation.
+Interpretation remains labeled as interpretation.
 
-### Protocol Candidate
+---
 
-The Protocol stage groups validated Proxies and creates unconfirmed Protocol Candidates with explicit:
+## 3. Protocol Candidate
 
-- triggers and trigger conditions;
-- required and optional inputs;
+The Protocol stage groups validated Proxies into explicit candidate workflows.
+
+A Protocol Candidate may define:
+
+- triggers;
+- trigger conditions;
+- required inputs;
+- optional inputs;
 - preconditions;
-- ordered steps and executors;
-- routing rules and precedence;
+- ordered steps;
+- executors;
+- routing rules;
+- route precedence;
 - stop conditions;
 - human-review boundaries;
 - forbidden actions;
@@ -341,43 +744,50 @@ The Protocol stage groups validated Proxies and creates unconfirmed Protocol Can
 - provenance;
 - activation requirements.
 
+Example:
+
 ```bash
 python -m src.protocol \
   receipts/proxies.yaml \
   --output receipts/protocol_candidates.yaml
 ```
 
-Every generated candidate begins with:
+Generated candidates begin unconfirmed.
 
 ```yaml
 intent:
   status: unconfirmed
 ```
 
-The default route is never silently treated as authorization for live execution.
+A candidate's default route must never be interpreted as live-execution authority.
 
-### Scenario Generation, Simulation, and Independent Grading
+---
 
-The Simulation stage generates synthetic scenarios from validated Protocol Candidates, evaluates declared routing behavior without external tools, and emits schema-valid Simulation Receipts.
+## 4. Scenario Generation
 
-```bash
-python -m src.simulation \
-  receipts/protocol_candidates.yaml \
-  --output receipts/simulation_receipts.yaml
-```
+The Foundry creates synthetic situations designed to exercise the candidate contract.
 
-The deterministic baseline covers applicable cases such as:
+Applicable scenarios may include:
 
 - nominal behavior;
-- missing or unknown inputs;
-- false and unsupported conditions;
+- missing inputs;
+- unknown inputs;
+- false conditions;
+- unsupported conditions;
 - human-review boundaries;
-- routing rules and route conflicts;
+- conflicting routes;
 - stop conditions;
 - known failures;
 - forbidden actions;
 - stale context;
-- under-escalation and overblocking.
+- under-escalation;
+- overblocking.
+
+---
+
+## 5. Deterministic Simulation
+
+Simulation evaluates the declared protocol without performing external actions.
 
 Route precedence is conservative:
 
@@ -385,93 +795,199 @@ Route precedence is conservative:
 DENY > ESCALATE > HOLD > REVIEW > AUTO
 ```
 
-Unsupported expressions route to `HOLD` and are recorded as failures.
+Unsupported expressions route to `HOLD`.
 
-The Independent Grader compares the candidate contract, predeclared expectation, simulated actual behavior, and safety invariants. It does not activate the candidate.
+They are recorded rather than silently ignored.
 
-### Selection
+---
 
-The Selection stage aggregates Simulation Receipts while keeping performance, diversity, and unusual behavior as separate signals.
+## 6. Independent Grading
 
-```bash
-python -m src.selection \
-  receipts/simulation_receipts.yaml \
-  --output receipts/selection_results.yaml
+The Independent Grader compares:
+
+```text
+candidate contract
++
+predeclared expectation
++
+simulated behavior
++
+safety invariants
 ```
+
+The Grader does not activate the candidate.
+
+Generation and grading remain separate roles.
+
+---
+
+## 7. Selection
+
+Selection aggregates Simulation Receipts while keeping different signals separate.
 
 | Archive | Purpose |
 |---|---|
 | `elite` | Strong aggregate performance with sufficient coverage |
-| `rare` | Coherent behavior that is materially distant from existing candidates |
-| `anomaly` | Scenario-specific variation or unsupported behavior requiring study |
+| `rare` | Coherent behavior materially distant from existing candidates |
+| `anomaly` | Scenario-specific or unsupported behavior requiring study |
 | `reject` | Unsafe, invalid, unsupported, or critically divergent behavior |
 
-`reject` is exclusive and takes precedence. A candidate may be both `elite` and `rare`.
+`reject` is exclusive and takes precedence.
 
-### PoC Promotion and Routing
+A candidate may be both:
 
-The Routing stage combines:
+```text
+elite
++
+rare
+```
+
+when appropriate.
+
+The goal is not only ranking.
+
+The Foundry also preserves useful diversity and anomalies.
+
+---
+
+## 8. PoC Promotion and Routing
+
+Promotion combines:
 
 - validated Protocol Candidates;
 - Selection Results;
-- optional real-world Evidence Manifests;
+- optional real-world Evidence Manifests.
 
-and emits one `poc_promotion` decision per candidate.
+Performance alone is not enough.
 
-```bash
-python -m src.routing \
-  receipts/protocol_candidates.yaml \
-  receipts/selection_results.yaml \
-  --output receipts/poc_promotions.yaml
-```
-
-Selection performance alone is not enough for promotion. The router rechecks:
+The Promotion gate may recheck:
 
 - archive membership;
 - observation count;
 - verified source diversity;
 - simulation count;
-- acceptable simulation rate;
+- acceptable Simulation rate;
 - critical divergences;
 - authority scope;
 - monitoring;
-- rollback or containment;
+- rollback;
+- containment;
 - human approval.
 
-Without evidence for required gates, the candidate remains on `HOLD`. This is intentional.
+Without evidence for required gates:
 
-### Shadow Execution
+```text
+HOLD
+```
 
-The Shadow stage compiles eligible candidates into inspectable plans using registered action-to-Adapter bindings.
-
-It does not call the Adapter. It proves that the candidate can or cannot cross the current execution boundary and records why.
+is the intended result.
 
 ---
 
-## Promotion Ladder
+## 9. Shadow Execution
+
+The Shadow stage compiles eligible Protocol Candidates into inspectable execution plans.
+
+It validates registered action-to-Adapter bindings.
+
+It does **not** invoke the Adapter.
+
+The purpose of Shadow is to determine whether the current candidate can safely cross the present execution boundary and to record why.
+
+---
+
+# Promotion Ladder
 
 Simulation is not proof.
 
 | Level | Stage |
 |---:|---|
 | 0 | Schema and contradiction checks |
-| 1 | Synthetic scenario simulation |
+| 1 | Synthetic Scenario Simulation |
 | 2 | Historical-log replay |
 | 3 | Shadow mode |
 | 4 | Limited and reversible PoC |
 | 5 | Monitored operation |
 
-The current integrated execution boundary supports Level 3 Shadow compilation. Levels 4 and 5 require future live Adapter infrastructure, operational controls, and explicit accountable ownership.
+The current integrated execution boundary supports Level 3 Shadow compilation.
+
+Levels 4 and 5 require additional infrastructure such as:
+
+- live Adapters;
+- accountable operators;
+- monitoring;
+- rollback;
+- containment;
+- authorization;
+- production controls.
 
 ---
 
-## Repository Structure
+# Generated Artifacts
+
+## Python integrated run
+
+A Python integrated run may write:
+
+```text
+00_run_manifest.yaml
+
+01_observations.yaml
+01_ingest_receipt.yaml
+
+02_proxies.yaml
+02_proxy_receipt.yaml
+
+03_protocol_candidates.yaml
+03_protocol_receipt.yaml
+
+04_simulation_receipts.yaml
+04_simulation_stage_receipt.yaml
+
+05_selection_results.yaml
+05_selection_stage_receipt.yaml
+
+06_poc_promotions.yaml
+06_routing_stage_receipt.yaml
+
+07_execution_plans.yaml
+07_action_receipts.yaml
+07_execution_stage_receipt.yaml
+```
+
+The execution artifacts are produced only when the Shadow boundary is requested.
+
+---
+
+## C++20 run
+
+The current C++ reference runtime writes JSON artifacts:
+
+```text
+01_observations.json
+02_proxies.json
+03_protocol_candidates.json
+04_simulation_receipts.json
+05_selection_results.json
+06_poc_promotions.json
+07_action_receipts.json
+```
+
+`07_action_receipts.json` is emitted only when Shadow bindings are supplied.
+
+---
+
+# Repository Structure
 
 ```text
 lopas-protocol-foundry/
 ├─ README.md
 ├─ LICENSE
 ├─ pyproject.toml
+│
+├─ .github/
+│  └─ workflows/
+│     └─ cpp.yml
 │
 ├─ schemas/
 │  ├─ observation.schema.yaml
@@ -493,6 +1009,39 @@ lopas-protocol-foundry/
 │  ├─ foundry/
 │  └─ execution/
 │
+├─ cpp/
+│  ├─ CMakeLists.txt
+│  ├─ README.md
+│  ├─ COMPATIBILITY.md
+│  ├─ VALIDATION.md
+│  │
+│  ├─ include/
+│  │  └─ lopas/
+│  │     ├─ types.hpp
+│  │     ├─ expression.hpp
+│  │     ├─ foundry.hpp
+│  │     └─ io.hpp
+│  │
+│  ├─ src/
+│  │  ├─ types.cpp
+│  │  ├─ expression.cpp
+│  │  ├─ foundry.cpp
+│  │  ├─ io.cpp
+│  │  └─ main.cpp
+│  │
+│  ├─ tests/
+│  │  └─ test_main.cpp
+│  │
+│  ├─ examples/
+│  │  ├─ observations.json
+│  │  ├─ evidence.json
+│  │  └─ adapter_bindings.json
+│  │
+│  └─ validation/
+│     ├─ default_promotion.json
+│     ├─ promoted_with_evidence.json
+│     └─ shadow_action_receipt.json
+│
 ├─ prompts/
 │  ├─ proxy_generation.md
 │  ├─ protocol_generation.md
@@ -507,19 +1056,109 @@ lopas-protocol-foundry/
 │  └─ local-runtime.md
 │
 ├─ receipts/
+│
 └─ tests/
    ├─ test_foundry_pipeline.py
    ├─ test_execution_gate.py
    └─ test_execution_pipeline.py
 ```
 
+The `.github/` directory belongs at the repository root.
+
+It should not be placed under `cpp/`.
+
 ---
 
-## Examples
+# Protocol vs Runtime
 
-### `examples/sample_run/`
+The Foundry increasingly treats these as separate concepts.
 
-A manually inspectable synthetic trace that preserves disagreement rather than hiding it:
+## Protocol layer
+
+The Protocol layer describes:
+
+- what was observed;
+- what is inferred;
+- what inputs are required;
+- what conditions apply;
+- what routes exist;
+- which route has precedence;
+- what is forbidden;
+- when a human is required;
+- what counts as failure;
+- what evidence is required for promotion.
+
+This is intended to remain independent from a specific implementation language.
+
+---
+
+## Runtime layer
+
+A runtime implements the contract.
+
+Current examples:
+
+```text
+Python 3.11+
+C++20
+```
+
+Future runtimes may include:
+
+```text
+JavaScript / TypeScript
+RPA
+local Agent runtime
+embedded systems
+service adapters
+```
+
+Adding another runtime should not silently change the protocol's safety invariants.
+
+---
+
+# Behavioral Parity
+
+The long-term goal is not source-code similarity.
+
+The goal is **behavioral parity**.
+
+For example:
+
+```text
+same Protocol Candidate
+        ↓
+   ┌────┴────┐
+   ↓         ↓
+Python     C++20
+   ↓         ↓
+Receipt   Receipt
+   └────┬────┘
+        ↓
+meaningful invariants match
+```
+
+Important invariants may include:
+
+- route;
+- rejection behavior;
+- unknown handling;
+- safety failures;
+- promotion eligibility;
+- Shadow status;
+- external-effect declarations.
+
+A future shared Golden Test suite should verify these invariants across runtimes.
+
+Until that suite exists and passes, the repository should not claim full Python/C++ parity.
+
+---
+
+# Examples
+
+## `examples/sample_run/`
+
+A manually inspectable synthetic trace:
 
 ```text
 Observation
@@ -531,264 +1170,466 @@ Observation
 → Simulation Receipt
 ```
 
-The sample exposes a stale-context gap: the candidate returns `REVIEW`, while the independent safety expectation is `HOLD`. The Grader identifies the missing guard and rejects that candidate version.
+The purpose is not to prove that a real workflow is safe or unsafe.
 
-The point is not that simulation proves a real workflow unsafe. The point is that the Foundry can preserve provenance, expose a missing guard, attribute the gap, and leave an inspectable receipt.
+The purpose is to show that the Foundry can:
 
-### `examples/full_run/`
-
-Fixtures and binding manifests for:
-
-- the integrated local runtime;
-- independent reruns of the Shadow boundary;
-- a synthetic confirmed and promoted Level 3 candidate;
-- verification that `READY` still produces zero external effects.
+- preserve provenance;
+- expose a missing guard;
+- preserve disagreement;
+- attribute divergence;
+- emit an inspectable receipt.
 
 ---
 
-## Prompt Contracts
+## `examples/full_run/`
 
-The prompt files remain stage-local specifications:
+Fixtures for:
+
+- integrated local execution;
+- independent Shadow reruns;
+- synthetic confirmed candidates;
+- Level 3 promotion;
+- READY validation;
+- zero-external-effect Shadow behavior.
+
+---
+
+## `cpp/examples/`
+
+Minimal JSON material for the C++20 reference runtime:
+
+```text
+observations.json
+evidence.json
+adapter_bindings.json
+```
+
+These examples exercise the typed deterministic runtime without claiming full Python fixture parity.
+
+---
+
+# Prompt Contracts
+
+The prompt files remain stage-local specifications.
 
 | Prompt | Input | Output |
 |---|---|---|
 | `proxy_generation.md` | validated Observation material | Proxy document |
 | `protocol_generation.md` | validated Proxy material | Protocol Candidate |
-| `scenario_generation.md` | one validated Protocol Candidate | Scenario Suite |
-| `independent_grader.md` | candidate, expectation, and simulated actuals | Independent Grade |
+| `scenario_generation.md` | validated Protocol Candidate | Scenario Suite |
+| `independent_grader.md` | candidate, expectation, simulated behavior | Independent Grade |
 
-The prompts are intended to:
+Prompts are intended to:
 
-- constrain the model’s role;
-- define allowed inputs and outputs;
-- preserve provenance and uncertainty;
-- forbid unsupported execution claims;
-- emit schema-oriented YAML;
+- constrain the model's role;
+- define allowed inputs;
+- define required outputs;
+- preserve provenance;
+- preserve uncertainty;
+- prohibit unsupported execution claims;
+- emit schema-oriented structured data;
 - keep deterministic validation outside the model where possible.
 
-The deterministic v0.1 runtime does not depend on an LLM being trusted as an execution authority.
+The runtime does not treat an LLM as execution authority.
 
 ---
 
-## Design Principles
+# Design Principles
 
-### Evidence before interpretation
+## Evidence before interpretation
 
 Source evidence and model interpretation must remain distinguishable.
 
-### Candidates before execution
+---
 
-Generated protocols begin as candidates. Activation requires explicit confirmation and promotion.
+## Candidates before execution
 
-### Receipts everywhere
+Generated protocols begin as candidates.
 
-Meaningful transformations should record:
-
-- input references;
-- schema, rule, prompt, model, and pipeline versions;
-- output identifiers;
-- validation results;
-- failures and divergences;
-- routing decisions;
-- timestamps;
-- promotion status;
-- execution-boundary decisions.
-
-### Deterministic boundaries
-
-LLMs may propose structure, but schemas, validation, route precedence, safety gates, promotion thresholds, and Adapter Binding checks should be deterministic whenever possible.
-
-### Independent expectations
-
-Scenario expectations should not simply copy the candidate’s default route. Independent safety expectations are required to expose missing guards.
-
-### Diversity, not only ranking
-
-The system preserves unusual but coherent candidates rather than optimizing only for average performance.
-
-### Reversible first
-
-Early PoCs should prefer low-impact, observable, bounded, and reversible operations.
-
-### Unknown means hold
-
-Missing evidence or unresolved contradictions route to `HOLD`, `REVIEW`, `ESCALATE`, or `DENY` rather than silent automation.
-
-### A blocked run is still a result
-
-A conservative system proves its value partly by refusing to cross a boundary without sufficient evidence, authority, inputs, approval, or bindings.
+Activation requires explicit confirmation and promotion.
 
 ---
 
-## Safety Boundaries
+## Receipts everywhere
+
+Meaningful transformations should record information such as:
+
+- input references;
+- schema version;
+- rule version;
+- prompt version;
+- model version;
+- runtime version;
+- pipeline version;
+- output identifiers;
+- validation results;
+- failures;
+- divergences;
+- routing decisions;
+- timestamps;
+- promotion state;
+- execution-boundary decisions.
+
+---
+
+## Deterministic boundaries
+
+LLMs may propose structure.
+
+Deterministic systems should own, whenever practical:
+
+- schema validation;
+- route precedence;
+- safety gates;
+- promotion thresholds;
+- binding checks;
+- explicit authority boundaries.
+
+---
+
+## Independent expectations
+
+Scenario expectations should not simply copy the candidate's default route.
+
+Independent expectations are needed to expose missing guards.
+
+---
+
+## Diversity, not only ranking
+
+The Foundry preserves unusual but coherent candidates instead of optimizing only for average performance.
+
+---
+
+## Reversible first
+
+Early PoCs should prefer operations that are:
+
+- bounded;
+- observable;
+- reversible;
+- low-impact.
+
+---
+
+## Unknown means HOLD
+
+Missing evidence and unresolved contradictions should produce conservative routing rather than silent automation.
+
+---
+
+## A blocked run is still a result
+
+A conservative system proves its value partly by refusing to cross a boundary without sufficient:
+
+- evidence;
+- authority;
+- approval;
+- inputs;
+- monitoring;
+- rollback;
+- bindings.
+
+---
+
+## Implementation language is not authority
+
+Changing:
+
+```text
+Python → C++
+```
+
+must not automatically change:
+
+```text
+HOLD → AUTO
+```
+
+or:
+
+```text
+DENY → READY
+```
+
+Runtime translation must preserve protocol meaning.
+
+---
+
+# Safety Boundaries
 
 A candidate should not be promoted or compiled into a Shadow Plan when:
 
 - provenance is missing or fabricated;
 - evidence and interpretation cannot be separated;
 - candidate intent is unconfirmed;
-- required inputs or authority are unknown;
-- the route exceeds declared authority;
+- required inputs are unknown;
+- authority is unknown;
+- the requested route exceeds authority;
 - external impact is high and reversibility is low;
-- required human review is absent or bypassed;
-- policy, privacy, legal, rights, or ownership ambiguity is unresolved;
-- simulation coverage is inadequate;
+- required human review is absent;
+- human review is bypassed;
+- policy ambiguity is unresolved;
+- privacy ambiguity is unresolved;
+- legal ambiguity is unresolved;
+- rights or ownership are unresolved;
+- Simulation coverage is inadequate;
 - critical divergences remain unresolved;
-- monitoring or rollback requirements are missing;
-- approvals are pending or rejected;
+- monitoring is missing;
+- rollback is missing;
+- approvals are pending;
+- approvals are rejected;
 - failures may remain silent;
 - the candidate depends on invented facts;
-- an Adapter Binding is absent or disabled;
-- a success-looking output is incomplete, stale, or unsafe.
+- Adapter Binding is absent;
+- Adapter Binding is disabled;
+- a success-looking output is stale, incomplete, or unsafe.
 
 The intended behavior is conservative:
 
 ```text
-unconfirmed           → HOLD
-confirmed + qualified → eligible for controlled promotion
-rejected              → DENY / REJECT
-insufficient evidence → HOLD
-missing binding       → HOLD
-rejected approval     → DENY
+unconfirmed            → HOLD
+confirmed + qualified  → eligible for controlled promotion
+rejected               → DENY / REJECT
+insufficient evidence  → HOLD
+missing binding        → HOLD
+rejected approval      → DENY
 ```
 
 ---
 
-## What This Project Is Not
+# What This Project Is Not
 
 LoPAS Protocol Foundry is not:
 
-- proof that LLM simulations predict real-world success;
+- proof that LLM Simulation predicts real-world success;
 - a finished autonomous business-process executor;
-- a production social-media scraping system;
-- a replacement for domain experts or accountable owners;
-- a system for copying individual creators’ work;
-- a way to bypass consent, policy, review, or responsibility;
-- a universal optimizer that produces one correct workflow;
-- a live Adapter runtime in its current form;
-- a stable hosted service or frozen SDK.
+- a production scraping system;
+- a replacement for domain experts;
+- a replacement for accountable owners;
+- a way to bypass human consent;
+- a way to bypass policy;
+- a way to bypass authorization;
+- a universal optimizer;
+- a live external-action runtime;
+- a stable hosted service;
+- a frozen SDK;
+- proof that the Python and C++ implementations are already identical.
 
-It is an experimental protocol discovery, evaluation, promotion, and safe Shadow-compilation layer.
+It is an experimental:
+
+```text
+Observation
+→ Translation
+→ Protocol
+→ Evaluation
+→ Gate
+→ Shadow Compilation
+→ Receipt
+```
+
+system.
 
 ---
 
-## Data and Provenance
+# Data and Provenance
 
 Recommended practice:
 
 - store references instead of unnecessary raw content;
-- minimize personal and confidential data;
-- preserve source identifiers and timestamps;
-- distinguish quotation, summary, interpretation, and inference;
-- record model, rule, schema, prompt, and pipeline versions;
-- maintain deletion, exclusion, and authority-withdrawal paths;
-- never invent source references or historical outcomes;
+- minimize personal data;
+- minimize confidential data;
+- preserve source identifiers;
+- preserve timestamps;
+- distinguish quotation from summary;
+- distinguish summary from interpretation;
+- distinguish interpretation from inference;
+- record model versions;
+- record rule versions;
+- record schema versions;
+- record prompt versions;
+- record pipeline versions;
+- record runtime implementation versions;
+- maintain deletion paths;
+- maintain exclusion paths;
+- maintain authority-withdrawal paths;
+- never invent source references;
+- never invent historical outcomes;
 - avoid promotion based on one weak observation;
-- keep synthetic fixtures clearly labeled as synthetic;
+- label synthetic fixtures clearly;
 - keep Action Receipts separate from claims of real-world execution.
 
-Future source adapters should emit the common Observation schema so downstream stages remain independent of the original platform.
+Future source adapters should emit the common Observation contract so downstream stages remain independent from the original platform.
 
 ---
 
-## Validation
+# Validation
 
-The integrated runtime additions are covered by deterministic tests for:
+## Python
+
+The Python integrated runtime includes deterministic tests covering behavior such as:
 
 - conservative execution-gate behavior;
-- missing bindings and required inputs;
-- rejected approvals and promotion decisions;
-- schema-compatible Level 3 READY compilation;
+- missing bindings;
+- missing required inputs;
+- rejected approvals;
+- rejected promotion decisions;
+- Level 3 READY compilation;
 - zero-external-effect Shadow output;
 - duplicate promotion rejection;
-- ordered composition of all existing Foundry stages;
-- the optional Shadow stage inside the same run.
+- ordered Foundry-stage composition;
+- optional Shadow execution inside the integrated run.
 
-The included runtime validation set contains 11 passing tests.
+These tests validate software behavior.
 
-This does not constitute production validation or proof of real-world effectiveness.
+They do not prove real-world effectiveness.
 
 ---
 
-## Roadmap
+## C++20
 
-### v0.1 — Local Foundry and Shadow Boundary
+The C++ runtime contains native tests under:
+
+```text
+cpp/tests/
+```
+
+Build and run:
+
+```bash
+cmake -S cpp -B cpp/build
+cmake --build cpp/build --parallel
+ctest --test-dir cpp/build --output-on-failure
+```
+
+Validation fixtures are stored under:
+
+```text
+cpp/validation/
+```
+
+Current C++ validation focuses on:
+
+- conservative default promotion;
+- promotion with explicit evidence;
+- Shadow receipt behavior;
+- deterministic route handling.
+
+See:
+
+```text
+cpp/VALIDATION.md
+```
+
+for the current validation boundary.
+
+---
+
+# Roadmap
+
+## v0.1 — Local Foundry and Shadow Boundary
 
 - [x] Core YAML schemas
-- [x] Deterministic Ingest stage
-- [x] Deterministic Proxy stage
-- [x] Deterministic Protocol Candidate stage
-- [x] Synthetic Scenario and Simulation stage
-- [x] Independent grading
-- [x] Selection archives and scoring
+- [x] Deterministic Ingest
+- [x] Deterministic Proxy
+- [x] Deterministic Protocol Candidate generation
+- [x] Synthetic Scenario generation
+- [x] Deterministic Simulation
+- [x] Independent Grading
+- [x] Selection archives
 - [x] Evidence-aware PoC Routing
-- [x] Stage-local CLIs
-- [x] Integrated one-process Foundry runner
+- [x] Stage-local Python CLIs
+- [x] Integrated Python Foundry runner
 - [x] Shadow Execution Plans
 - [x] Action Receipts with zero external effects
 - [x] Sample trace
 - [x] Synthetic Level 3 READY fixture
-- [x] Integrated runtime and execution-gate tests
+- [x] Python integrated tests
+- [x] Initial C++20 deterministic runtime port
+- [x] C++ CMake build
+- [x] C++ native tests
+- [x] C++ JSON boundary
 - [ ] Broader cross-schema fixture coverage
-- [ ] Complete architecture, safety, and PoC lifecycle documentation
+- [ ] Complete architecture documentation
 - [ ] Additional domain-specific examples
 
-### v0.2 — Replay and Comparison
+---
 
+## v0.2 — Runtime Parity, Replay, and Comparison
+
+- [ ] Shared Python/C++ Golden Test fixtures
+- [ ] Behavioral parity reports
+- [ ] YAML support in C++ runtime
+- [ ] Broader schema parity
 - [ ] Historical-log replay adapters
 - [ ] Candidate mutation
 - [ ] Expanded behavioral-distance metrics
 - [ ] Protocol comparison
 - [ ] Divergence reports
-- [ ] Prompt, rule, and model version comparison
-- [ ] Repeated-run evidence aggregation
+- [ ] prompt/rule/model/runtime version comparison
+- [ ] repeated-run evidence aggregation
 
-### v0.3 — Controlled Adapters
+---
+
+## v0.3 — Controlled Adapters
 
 - [ ] Generic local-file Adapter
 - [ ] Human-review queue
 - [ ] Meeting-log Adapter
 - [ ] Support-log Adapter
 - [ ] Reversible live-action contract
-- [ ] Rollback and containment interfaces
-- [ ] Operator approval console
-
-### Later Exploration
-
-- distributed observation sources;
-- Quality-Diversity search;
-- multi-model simulation;
-- domain-specific graders;
-- protocol registries;
-- ProtocolMemory feedback loops;
-- controlled Action Adapter integration;
-- monitored Level 4 and Level 5 operation.
+- [ ] rollback interfaces
+- [ ] containment interfaces
+- [ ] operator approval console
 
 ---
 
-## Contributing
+## Later Exploration
+
+- distributed observation sources;
+- Quality-Diversity search;
+- multi-model Simulation;
+- domain-specific Graders;
+- Protocol registries;
+- ProtocolMemory feedback loops;
+- controlled Action Adapter integration;
+- additional runtime implementations;
+- monitored Level 4 operation;
+- monitored Level 5 operation.
+
+---
+
+# Contributing
 
 This repository is experimental and safety-oriented.
 
 Useful contributions include:
 
 - schema review;
-- valid and invalid fixtures;
+- valid fixtures;
+- invalid fixtures;
 - adversarial scenarios;
 - deterministic validators;
 - provenance tooling;
-- simulation and grader tests;
+- Simulation tests;
+- Grader tests;
 - behavioral-distance metrics;
 - small reproducible domain examples;
-- safety and promotion-gate tests;
-- Shadow boundary tests;
-- documentation that clearly separates implemented behavior from planned behavior.
+- safety-gate tests;
+- Promotion tests;
+- Shadow-boundary tests;
+- Python/C++ Golden Test fixtures;
+- runtime parity tooling;
+- documentation that clearly distinguishes implemented behavior from planned behavior.
 
-Keep examples inspectable. Do not commit sensitive, confidential, or personally identifiable data.
+Keep examples inspectable.
+
+Do not commit sensitive, confidential, or personally identifiable data.
 
 ---
 
-## License
+# License
 
 See `LICENSE` for the current terms.
 
@@ -796,6 +1637,6 @@ Do not assume permissions beyond the contents of that file.
 
 ---
 
-## One-Sentence Summary
+# One-Sentence Summary
 
-**LoPAS Protocol Foundry turns fragmented observations into traceable Protocol Candidates, tests and selects them through deterministic safety gates, and compiles only qualified candidates into no-side-effect Shadow Plans and Action Receipts.**
+**LoPAS Protocol Foundry translates fragmented observations into traceable Protocol Candidates, tests them through deterministic and evidence-aware gates, and allows qualified protocols to be compiled into conservative runtimes and no-side-effect Shadow Receipts without tying the protocol itself to one implementation language.**
