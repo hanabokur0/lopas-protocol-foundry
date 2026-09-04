@@ -1,0 +1,5 @@
+[
+  {"action": "normalize_input", "enabled": true},
+  {"action": "evaluate_candidate", "enabled": true},
+  {"action": "review_before_external_effect", "enabled": true}
+]
