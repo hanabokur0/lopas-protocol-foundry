@@ -1,0 +1,13 @@
+[
+  {
+    "protocol_candidate_ref": "protocol-cluster-meeting_preparation",
+    "source_diversity": 2,
+    "monitoring_defined": true,
+    "rollback_defined": true,
+    "authority_scope": "shadow_only",
+    "approval": {
+      "status": "approved",
+      "approver_ref": "protocol-owner-001"
+    }
+  }
+]
