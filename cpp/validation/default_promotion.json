@@ -1,0 +1,3 @@
+[
+  {"protocol_candidate_ref":"protocol-cluster-meeting_preparation","decision":"HOLD","eligible":false,"current_level":1,"next_level":2,"reasons":["Candidate intent is not confirmed.","Evidence manifest missing: source diversity, monitoring, rollback, authority, and approval remain unknown."]}
+]
