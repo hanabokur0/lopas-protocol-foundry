@@ -1,0 +1,3 @@
+[
+  {"protocol_candidate_ref":"protocol-cluster-meeting_preparation","route":"AUTO","status":"shadowed","external_effects":[],"steps":["step-1: normalize_input [external_effect:none]","step-2: evaluate_candidate [external_effect:none]","step-3: review_before_external_effect [external_effect:none]"],"reasons":[]}
+]
