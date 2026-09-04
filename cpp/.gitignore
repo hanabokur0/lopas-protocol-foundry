@@ -1,0 +1,6 @@
+build/
+receipts/
+*.o
+*.a
+*.so
+.DS_Store
