@@ -1,0 +1,20 @@
+[
+  {
+    "id": "obs-001",
+    "task_type": "meeting_preparation",
+    "summary": "Meeting preparation repeatedly requires collecting context from several sources before a human review.",
+    "source_ref": "example-source-001",
+    "external_impact": false,
+    "reversible": true,
+    "confidence": 0.92
+  },
+  {
+    "id": "obs-002",
+    "task_type": "meeting_preparation",
+    "summary": "Missing context should stop preparation rather than inventing a result.",
+    "source_ref": "example-source-002",
+    "external_impact": false,
+    "reversible": true,
+    "confidence": 0.88
+  }
+]
