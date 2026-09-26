@@ -1,0 +1,266 @@
+- schema_version: 0.1.0
+  id: protocol-community-health-shadow-001
+  version: 0.1.0
+  created_at: '2026-09-26T04:30:00Z'
+
+  intent:
+    status: confirmed
+    requested_by: lopas-protocol-foundry
+    confirmation_refs:
+      - approval-community-health-shadow-001
+    note: >-
+      Synthetic shadow-only community-health routing example. It is not a
+      clinical device, diagnosis system, prescription system, or evidence of
+      medical effectiveness.
+
+  task:
+    type: community_health_routing
+    context: synthetic camera, questionnaire, and low-cost sensor observations
+    description: >-
+      Assess observation quality, normalize authorized inputs, create a
+      provisional non-diagnostic risk classification, require clinician review,
+      and propose a care route without performing any external action.
+
+  proxy_refs:
+    - proxy-community-health-shadow-001
+
+  trigger:
+    event: authorized_health_observation_received
+    conditions:
+      - expression: consent_valid == true
+        description: The person or authorized test fixture permits this shadow evaluation.
+        on_unknown: HOLD
+
+  inputs:
+    required:
+      - health_observation
+      - consent_context
+      - care_policy
+      - clinician_availability
+    optional:
+      - prior_observation_summary
+      - device_quality_metadata
+
+  preconditions:
+    - expression: synthetic_or_authorized_input == true
+      description: Input is synthetic or explicitly authorized for this evaluation.
+      on_unknown: HOLD
+    - expression: care_policy_available == true
+      description: The applicable care and data-handling policy is available.
+      on_unknown: HOLD
+    - expression: clinician_review_path_available == true
+      description: A declared human clinical-review path exists.
+      on_unknown: HOLD
+
+  steps:
+    - id: step-assess-capture-quality
+      action: assess_capture_quality
+      executor: rule
+      description: >-
+        Check whether camera, questionnaire, and sensor observations are usable
+        enough for shadow analysis without inferring identity.
+      input_refs:
+        - health_observation
+        - device_quality_metadata
+      output_refs:
+        - capture_quality_assessment
+      requires_human_confirmation: false
+      on_failure: HOLD
+
+    - id: step-normalize-health-observation
+      action: normalize_health_observation
+      executor: rule
+      description: >-
+        Normalize declared observations while preserving source values and
+        leaving unknown fields unknown.
+      input_refs:
+        - health_observation
+        - consent_context
+      output_refs:
+        - normalized_observation
+      requires_human_confirmation: false
+      on_failure: HOLD
+
+    - id: step-classify-triage-risk
+      action: classify_triage_risk
+      executor: hybrid
+      description: >-
+        Produce a provisional routing-oriented risk assessment. The output is
+        not a diagnosis and may not prescribe, modify, or dispense medication.
+      input_refs:
+        - normalized_observation
+        - care_policy
+      output_refs:
+        - provisional_risk_assessment
+      requires_human_confirmation: false
+      on_failure: REVIEW
+
+    - id: step-request-clinician-review
+      action: request_clinician_review
+      executor: human
+      description: >-
+        Require an authorized clinician to review the observation quality,
+        normalized observation, and provisional assessment before any route is
+        accepted.
+      input_refs:
+        - capture_quality_assessment
+        - normalized_observation
+        - provisional_risk_assessment
+        - clinician_availability
+      output_refs:
+        - clinician_review_decision
+      requires_human_confirmation: true
+      on_failure: ABORT
+
+    - id: step-propose-care-route
+      action: propose_care_route
+      executor: rule
+      description: >-
+        Produce a shadow-only routing proposal after clinician review. The
+        adapter must not contact a provider, emergency service, pharmacy, or
+        patient.
+      input_refs:
+        - provisional_risk_assessment
+        - clinician_review_decision
+        - care_policy
+      output_refs:
+        - care_route_proposal
+      requires_human_confirmation: true
+      on_failure: HOLD
+
+  routing:
+    default: REVIEW
+    rules:
+      - when:
+          expression: consent_valid != true
+          description: Valid consent or test authorization is absent.
+          on_unknown: HOLD
+        route: HOLD
+        reason: Health observations must not proceed without declared authorization.
+
+      - when:
+          expression: capture_quality_insufficient == true
+          description: Observation quality is insufficient for a reliable shadow assessment.
+          on_unknown: HOLD
+        route: HOLD
+        reason: Poor-quality observations must not be converted into confident classifications.
+
+      - when:
+          expression: emergency_signal_detected == true
+          description: The provisional assessment identifies a declared emergency signal.
+          on_unknown: ESCALATE
+        route: ESCALATE
+        reason: A potential emergency requires immediate human escalation, never autonomous routing.
+
+      - when:
+          expression: clinical_uncertainty_high == true
+          description: The model or rule layer reports high clinical uncertainty.
+          on_unknown: ESCALATE
+        route: ESCALATE
+        reason: High uncertainty requires human review rather than model completion.
+
+      - when:
+          expression: clinician_review_approved == true
+          description: An authorized clinician approved the shadow routing proposal.
+          on_unknown: REVIEW
+        route: REVIEW
+        reason: Even an approved result remains review-only in this shadow candidate.
+
+  stop_conditions:
+    - expression: consent_withdrawn == true
+      description: Authorization to use the health observation was withdrawn.
+      on_unknown: HOLD
+    - expression: clinician_review_path_available != true
+      description: The required human clinical-review path is unavailable.
+      on_unknown: HOLD
+    - expression: care_policy_available != true
+      description: Applicable care or data policy cannot be established.
+      on_unknown: HOLD
+    - expression: external_action_requested == true
+      description: A caller requests contact, dispensing, prescription, diagnosis, or real-world routing.
+      on_unknown: DENY
+
+  outputs:
+    - name: capture_quality_assessment
+      type: structured_assessment
+      description: Quality and completeness assessment of the authorized observations.
+      sensitive: true
+
+    - name: normalized_observation
+      type: structured_observation
+      description: Normalized observation with unknown values preserved as unknown.
+      sensitive: true
+
+    - name: provisional_risk_assessment
+      type: non_diagnostic_risk_assessment
+      description: Provisional routing-oriented assessment requiring human review.
+      sensitive: true
+
+    - name: clinician_review_decision
+      type: structured_decision
+      description: Human review decision for the provisional assessment and route.
+      sensitive: true
+
+    - name: care_route_proposal
+      type: shadow_route_proposal
+      description: A no-side-effect proposal such as hold, review, or escalate.
+      sensitive: true
+
+  failure_handling:
+    default_route: HOLD
+    retry_limit: 1
+    record_receipt: true
+    known_failures:
+      - code: INPUT_NOT_AUTHORIZED
+        description: The observation is neither synthetic nor explicitly authorized.
+        route: HOLD
+      - code: CAPTURE_QUALITY_INSUFFICIENT
+        description: Camera, questionnaire, or sensor quality is insufficient.
+        route: HOLD
+      - code: CLINICAL_UNCERTAINTY_HIGH
+        description: The provisional classifier cannot support a stable routing assessment.
+        route: ESCALATE
+      - code: CLINICIAN_REVIEW_UNAVAILABLE
+        description: The required authorized reviewer is unavailable.
+        route: HOLD
+      - code: EXTERNAL_ACTION_REQUESTED
+        description: A caller requests a real-world medical or communication action.
+        route: DENY
+
+  safety:
+    external_impact: high
+    reversibility: medium
+    authority_scope: suggest
+    creative_ownership_signal: false
+    personal_data_possible: true
+    required_human_review: true
+    forbidden_actions:
+      - activate_without_promotion
+      - execute_when_required_input_is_unknown
+      - infer_identity_from_image
+      - diagnose_patient
+      - prescribe_medication
+      - modify_medication
+      - dispense_medication
+      - contact_emergency_services
+      - contact_health_provider
+      - route_without_clinician_review
+      - retain_biometric_data_without_declared_policy
+      - share_health_data_without_declared_authority
+
+  activation:
+    required_observations: 30
+    required_source_diversity: 3
+    required_simulations: 30
+    minimum_pass_rate: 0.95
+    human_confirmation: true
+
+  provenance:
+    observation_refs:
+      - obs-community-health-shadow-001
+    proxy_refs:
+      - proxy-community-health-shadow-001
+    generator: generated_test_fixture
+    model: null
+    prompt_version: null
+    rule_version: community-health-shadow-0.1.0
