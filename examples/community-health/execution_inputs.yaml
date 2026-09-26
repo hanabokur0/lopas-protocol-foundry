@@ -1,0 +1,39 @@
+- protocol_candidate_ref: protocol-community-health-shadow-001
+  values:
+    health_observation:
+      observation_id: synthetic-health-001
+      source: simulated_camera_and_questionnaire
+      captured_at: '2026-09-26T04:30:00Z'
+      synthetic: true
+      camera:
+        image_present: true
+        image_type: simulated_tongue_image
+        quality_score: 0.92
+        identity_features_requested: false
+      questionnaire:
+        fever_reported: false
+        breathing_difficulty_reported: false
+        severe_pain_reported: false
+        duration_days: 2
+      vitals:
+        temperature_c: 36.8
+        spo2_percent: 98
+
+    consent_context:
+      valid: true
+      scope: shadow_simulation
+      biometric_reuse_permitted: false
+      external_data_sharing_permitted: false
+
+    care_policy:
+      policy_id: synthetic-community-health-policy-v1
+      diagnosis_allowed: false
+      prescription_allowed: false
+      medication_change_allowed: false
+      dispensing_allowed: false
+      external_routing_allowed: false
+      clinician_review_required: true
+
+    clinician_availability:
+      available: true
+      reviewer_ref: synthetic-clinician-001
