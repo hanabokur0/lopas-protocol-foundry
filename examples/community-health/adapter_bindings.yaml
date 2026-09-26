@@ -1,0 +1,54 @@
+schema_version: 0.1.0
+manifest_version: community-health-shadow-0.1.0
+
+bindings:
+  assess_capture_quality:
+    adapter: rule.community_health.capture_quality.v1
+    enabled: true
+    config:
+      mode: shadow_only
+      domain: community_health
+      external_effects: none
+      reject_identity_inference: true
+      require_synthetic_or_authorized_input: true
+
+  normalize_health_observation:
+    adapter: rule.community_health.normalize.v1
+    enabled: true
+    config:
+      mode: shadow_only
+      domain: community_health
+      external_effects: none
+      preserve_source_values: true
+      invent_missing_values: false
+
+  classify_triage_risk:
+    adapter: model.community_health.triage.v1
+    enabled: true
+    config:
+      mode: shadow_only
+      domain: community_health
+      external_effects: none
+      output_is_provisional: true
+      diagnosis_allowed: false
+      prescription_allowed: false
+      fail_closed_on_uncertainty: true
+
+  request_clinician_review:
+    adapter: human.clinician_review.v1
+    enabled: true
+    config:
+      mode: shadow_only
+      domain: community_health
+      external_effects: none
+      required: true
+
+  propose_care_route:
+    adapter: rule.community_health.route.v1
+    enabled: true
+    config:
+      mode: shadow_only
+      domain: community_health
+      external_effects: none
+      external_routing_allowed: false
+      require_clinician_review: true
