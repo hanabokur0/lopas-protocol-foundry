@@ -1,0 +1,72 @@
+- schema_version: 0.1.0
+  id: poc-community-health-shadow-001
+  protocol_candidate_ref: protocol-community-health-shadow-001
+  decided_at: '2026-09-26T04:35:00Z'
+  current_level: 2
+  requested_next_level: 3
+
+  simulation_receipt_refs:
+    - simrcpt-community-health-shadow-001
+
+  evidence_refs:
+    - synthetic-shadow-fixture-only
+
+  eligibility:
+    eligible: true
+    checks:
+      provenance_complete: true
+      schema_valid: true
+      simulation_coverage_sufficient: true
+      authority_defined: true
+      monitoring_defined: true
+      rollback_defined: true
+      human_review_satisfied: true
+    reasons: []
+
+  risk_assessment:
+    external_impact: high
+    reversibility: medium
+    data_sensitivity: high
+    silent_failure_risk: high
+    overall: high
+    mitigations:
+      - shadow mode only
+      - synthetic fixture only
+      - adapters are resolved but never invoked
+      - no diagnosis, prescription, dispensing, or external contact
+      - clinician review is mandatory
+      - unknown or missing evidence fails closed to HOLD or ESCALATE
+
+  decision:
+    route: PROMOTE
+    reason: >-
+      Synthetic Level 3 shadow-compatibility fixture only. Promotion authorizes
+      compilation of a no-side-effect shadow plan, not clinical use.
+    archive: rare
+    expires_at: null
+
+  conditions: []
+
+  approvals:
+    - role: protocol_owner
+      approver_ref: human-test-owner-001
+      status: approved
+      decided_at: '2026-09-26T04:35:00Z'
+      note: Synthetic fixture approval for Level 3 shadow compilation only.
+
+    - role: clinical_safety_reviewer
+      approver_ref: human-test-clinical-001
+      status: approved
+      decided_at: '2026-09-26T04:35:00Z'
+      note: >-
+        Approval confirms the safety boundary of the fixture only; it is not
+        validation of medical effectiveness.
+
+  provenance:
+    decision_engine: generated_test_fixture
+    decision_engine_version: community-health-shadow-0.1.0
+    recorded_by: runtime-compatibility-test
+    rule_refs:
+      - shadow-level-3
+      - human-review-required
+      - no-clinical-external-effects
